@@ -649,23 +649,54 @@ def create_enhanced_wordclouds(positive_words, negative_words, theme_analysis, c
 def main():
     """Main Streamlit application"""
     
-    # Header
-    st.title("🚀 Enhanced Sentiment Analysis Tool")
-    st.markdown("**Comprehensive sentiment analysis for any text: novels, articles, reviews, news, social media, academic papers**")
+    # Header with beta badge
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.title("🚀 Enhanced Sentiment Analysis Tool")
+    with col2:
+        st.markdown("<div style='text-align: right; margin-top: 20px;'><span style='background-color: #FF6B6B; color: white; padding: 5px 15px; border-radius: 15px; font-weight: bold; font-size: 14px;'>BETA</span></div>", unsafe_allow_html=True)
+    
+    st.markdown("**Comprehensive sentiment analysis for any text: novels, articles, reviews, news, social media, academic papers, interviews, and more**")
+    
+    # Quick info banner
+    st.info("💡 **New to this tool?** Start by uploading a text file or pasting text below, select your material type (or use auto-detect), then click 'Analyze Sentiment'. Check the 'Methodology & Limitations' section at the bottom for details.")
     
     # Sidebar configuration
     st.sidebar.header("⚙️ Configuration")
     
-    # Material type selection
-    material_type = st.sidebar.selectbox(
-        "Select Material Type",
-        ["auto", "novel", "news", "reviews", "social_media", "academic", "articles"],
-        help="Choose the type of text for optimized analysis. 'auto' will detect automatically."
+    # Material type selection with descriptions
+    material_type_options = {
+        "auto": "🔍 Auto-detect (recommended)",
+        "novel": "📚 Novel / Fiction / Literature",
+        "news": "📰 News Articles / Journalism",
+        "reviews": "⭐ Product Reviews / Ratings",
+        "social_media": "💬 Social Media / Posts / Comments",
+        "academic": "🎓 Academic Papers / Research",
+        "articles": "✍️ Blog Posts / Opinion Pieces"
+    }
+    
+    material_type_display = st.sidebar.selectbox(
+        "📚 Select Material Type",
+        list(material_type_options.values()),
+        help="Choose the type of text for optimized sentiment thresholds and analysis. Auto-detect works well for most cases."
     )
+    
+    # Convert display name back to key
+    material_type = [k for k, v in material_type_options.items() if v == material_type_display][0]
+    
+    # Show what settings are being used
+    if material_type != 'auto':
+        with st.sidebar.expander("ℹ️ Current Settings"):
+            config_preview = AnalysisConfig(material_type)
+            st.write(f"**Sentiment Thresholds:**")
+            st.write(f"• Positive: ≥ {config_preview.POSITIVE_THRESHOLD}")
+            st.write(f"• Negative: ≤ {config_preview.NEGATIVE_THRESHOLD}")
+            st.write(f"• Context window: {config_preview.CONTEXT_WINDOW} words")
+            st.write(f"• N-gram size: {config_preview.NGRAM_SIZE}")
     
     # Add note about large files
     st.sidebar.markdown("---")
-    st.sidebar.info("💡 **Tip**: For large files (>50,000 words), analysis may take several minutes. Consider analyzing a shorter excerpt for faster results.")
+    st.sidebar.info("💡 **Performance Tip**: For large files (>50,000 words), analysis may take several minutes. Consider analyzing a shorter excerpt for faster results.")
     
     # File upload or text input
     st.header("📁 Input Text")
@@ -708,11 +739,16 @@ def main():
             placeholder="Enter the text you want to analyze..."
         )
     
-    # Analyze button
-    if st.button("🔍 Analyze Sentiment", type="primary") and raw_text:
+    # Analyze button with better styling
+    st.markdown("---")
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        analyze_button = st.button("🔍 Analyze Sentiment", type="primary", use_container_width=True)
+    
+    if analyze_button and raw_text:
         if len(raw_text.strip()) < 10:
-            st.warning("Please enter more text for meaningful analysis.")
-            return
+            st.error("⚠️ Please enter more text for meaningful analysis (at least 10 characters).")
+            st.stop()
         
         # Warn about large files
         word_count = len(raw_text.split())
@@ -739,8 +775,9 @@ def main():
             results_data, config = run_sentiment_analysis(raw_text, material_type)
             
             # Step 4: Complete
-            status_text.text("✅ Analysis complete!")
             progress_bar.progress(100)
+            status_text.empty()
+            st.success("✅ Analysis complete! Scroll down to see results.")
             
             # Clear progress indicators
             progress_bar.empty()
@@ -752,13 +789,49 @@ def main():
         except Exception as e:
             progress_bar.empty()
             status_text.empty()
-            st.error(f"Error during analysis: {e}")
-            st.exception(e)
+            st.error(f"❌ Error during analysis: {str(e)}")
+            
+            # Try simple fallback analysis
+            with st.expander("🔧 Attempting simplified analysis..."):
+                try:
+                    st.info("Running basic sentiment analysis as fallback...")
+                    fallback_results, fallback_config = run_simple_sentiment_analysis(raw_text, material_type)
+                    st.success("✅ Simplified analysis completed!")
+                    display_streamlit_results(fallback_results, fallback_config)
+                except Exception as fallback_error:
+                    st.error(f"Simplified analysis also failed: {str(fallback_error)}")
+                    st.write("**Troubleshooting tips:**")
+                    st.write("• Try a shorter text excerpt")
+                    st.write("• Ensure text is primarily English")
+                    st.write("• Check for unusual characters or formatting")
+                    st.write("• Try selecting a specific material type instead of auto-detect")
+                    with st.expander("📋 Full error details"):
+                        st.exception(e)
+    else:
+        # Show helpful empty state
+        if not raw_text:
+            st.markdown("---")
+            st.markdown("""
+            <div style='text-align: center; padding: 40px; background-color: #f0f2f6; border-radius: 10px;'>
+                <h3>👆 Upload a file or paste text above to get started</h3>
+                <p style='color: #666;'>This tool will analyze sentiment, identify themes, and provide insights about your text.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Show example
+            with st.expander("📖 See an example"):
+                st.write("**Example text types this tool can analyze:**")
+                st.write("• 📚 **Novels & Fiction**: Detect emotional arcs, character sentiments, narrative tone")
+                st.write("• 📰 **News Articles**: Identify bias, sentiment toward topics, journalistic tone")
+                st.write("• ⭐ **Reviews**: Aggregate customer sentiment, identify pain points and praise")
+                st.write("• 💬 **Social Media**: Analyze public opinion, trending sentiments, engagement")
+                st.write("• 🎓 **Academic Papers**: Evaluate argumentative tone, critique patterns")
+                st.write("• 🗣️ **Interviews & Transcripts**: Sentiment flow, speaker emotions, key themes")
 
 def run_sentiment_analysis(raw_text, material_type):
     """Run the sentiment analysis and return results"""
-
-            # Auto-detect material type or use specified type
+    
+    # Auto-detect material type or use specified type
     config = AnalysisConfig(material_type)
     if material_type == 'auto':
         detected_type = config.auto_detect_material_type(raw_text[:5000])  # Sample first 5000 chars for better detection
@@ -991,8 +1064,22 @@ def display_streamlit_results(results_data, config):
     create_streamlit_visualizations(results_data, config)
     
     # Methodology notes
-    with st.expander("⚠️ Methodology & Limitations"):
-            display_methodology_notes(config)
+    with st.expander("⚠️ Methodology & Limitations - Click to expand"):
+        display_methodology_notes(config)
+    
+    # Footer
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("""
+        <div style='text-align: center; color: #666; font-size: 12px;'>
+            <p><strong>Enhanced Sentiment Analysis Tool v1.0-beta</strong></p>
+            <p>Built with VADER (NLTK) • Powered by Streamlit</p>
+            <p>📧 <a href="https://github.com/fantasy-library/sentiment" target="_blank">GitHub</a> • 
+            <a href="https://github.com/fantasy-library/sentiment/issues" target="_blank">Report Issues</a> • 
+            <a href="https://www.nltk.org/" target="_blank">NLTK Docs</a></p>
+        </div>
+        """, unsafe_allow_html=True)
 
 def create_streamlit_visualizations(results_data, config):
     """Create Streamlit-compatible visualizations"""
@@ -1191,10 +1278,22 @@ def display_methodology_notes(config):
     st.markdown("""
     **Sentiment Analysis:**
     - **VADER (Valence Aware Dictionary and sEntiment Reasoner)** - NLTK implementation
-      - Lexicon-based sentiment analysis tool
-      - Optimized for social media and informal text
-      - Includes handling for emojis, capitalization, and punctuation emphasis
-      - Version: NLTK 3.x VADER Lexicon
+      - **Core**: Lexicon-based sentiment analysis with 7,500+ lexical features
+      - **Originally optimized for**: Social media and informal text
+      - **Extended in this tool for**: Novels, news articles, academic papers, reviews, interviews, and general text
+      - **Special handling for**:
+        - Emojis and emoticons (e.g., 😊, :), :(  )
+        - Capitalization emphasis (e.g., "AMAZING" vs "amazing")
+        - Punctuation emphasis (e.g., "good!!!" vs "good")
+        - Negations (e.g., "not good", "never bad")
+        - Degree modifiers (e.g., "very good", "extremely bad")
+        - Contrasting conjunctions (e.g., "but", "however")
+      - **Material-specific adaptations**:
+        - Adjustable sentiment thresholds for different text types
+        - Context window analysis (3-5 words) for nuanced understanding
+        - N-gram analysis (2-3 word phrases) for idiomatic expressions
+        - Literary device preservation for narrative fiction
+      - **Version**: NLTK 3.x VADER Lexicon
     
     **Readability Analysis:**
     - **Flesch Reading Ease** - Textstat library
