@@ -188,12 +188,12 @@ class AnalysisConfig:
     def update_for_detected_type(self, detected_type):
         """Update configuration based on auto-detected type"""
         if detected_type in self.MATERIAL_PRESETS:
-            print(f"📋 Auto-detected material type: {detected_type}")
-            print(f"🔧 Applying optimized settings for {detected_type} analysis...")
+            st.info(f"Auto-detected material type: {detected_type}")
+            st.info(f"Applying optimized settings for {detected_type} analysis...")
             self._apply_preset(detected_type)
             self.material_type = detected_type
         else:
-            print(f"📋 Could not auto-detect material type. Using default settings.")
+            st.info(f"Could not auto-detect material type. Using default settings.")
 
 # ----------------------
 # ENHANCED TEXT PREPROCESSING
