@@ -731,7 +731,7 @@ def main():
                     raw_text = str(uploaded_file.read(), "utf-8")
             except Exception as e:
                 st.error(f"Error reading file: {e}")
-                return
+                raw_text = ""
     else:
         raw_text = st.text_area(
             "Paste your text here:",
@@ -830,8 +830,8 @@ def main():
 
 def run_sentiment_analysis(raw_text, material_type):
     """Run the sentiment analysis and return results"""
-    
-    # Auto-detect material type or use specified type
+
+            # Auto-detect material type or use specified type
     config = AnalysisConfig(material_type)
     if material_type == 'auto':
         detected_type = config.auto_detect_material_type(raw_text[:5000])  # Sample first 5000 chars for better detection
@@ -843,15 +843,15 @@ def run_sentiment_analysis(raw_text, material_type):
         if material_type in config.MATERIAL_PRESETS:
             config._apply_preset(material_type)
 
-    # Enhanced preprocessing
-    processed_text = enhanced_preprocess_text(raw_text, config)
+            # Enhanced preprocessing
+            processed_text = enhanced_preprocess_text(raw_text, config)
 
-    # Run enhanced analyses
-    sia = SentimentIntensityAnalyzer()
-    overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
-    word_analysis = get_enhanced_word_sentiments(processed_text, config)
-    sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
-    segment_analysis = enhanced_segment_analysis(processed_text, config)
+            # Run enhanced analyses
+            sia = SentimentIntensityAnalyzer()
+            overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
+            word_analysis = get_enhanced_word_sentiments(processed_text, config)
+            sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
+            segment_analysis = enhanced_segment_analysis(processed_text, config)
 
     # Separate positive and negative words
     positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
@@ -915,6 +915,76 @@ def run_sentiment_analysis(raw_text, material_type):
         'text_metrics': processed_text
     }
 
+    return results_data, config
+
+def run_simple_sentiment_analysis(raw_text, material_type):
+    """Simplified fallback sentiment analysis"""
+    config = AnalysisConfig(material_type if material_type != 'auto' else 'articles')
+    
+    # Basic preprocessing
+    cleaned_text = re.sub(r'[^\w\s]', ' ', raw_text)
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+    
+    # Basic sentiment
+    sia = SentimentIntensityAnalyzer()
+    overall_sentiment = sia.polarity_scores(cleaned_text)
+    
+    # Basic word analysis
+    tokens = word_tokenize(cleaned_text.lower())
+    word_scores = []
+    for token in tokens[:1000]:  # Limit to first 1000 words
+        if token.isalpha() and len(token) > 2:
+            score = sia.polarity_scores(token)
+            if score['compound'] != 0:
+                word_scores.append({
+                    'word': token,
+                    'score': score['compound'],
+                    'count': 1,
+                    'positions': [],
+                    'contexts': [],
+                    'sentence_positions': [],
+                    'sentence_spread': 0,
+                    'sample_contexts': []
+                })
+    
+    # Separate positive and negative
+    positive_words = [w for w in word_scores if w['score'] > 0.05][:20]
+    negative_words = [w for w in word_scores if w['score'] < -0.05][:20]
+    
+    results_data = {
+        'overall_sentiment': {
+            'score': overall_sentiment['compound'],
+            'label': 'positive' if overall_sentiment['compound'] > 0.05
+                    else 'negative' if overall_sentiment['compound'] < -0.05
+                    else 'neutral',
+            'confidence': max(overall_sentiment['pos'], overall_sentiment['neg'], overall_sentiment['neu'])
+        },
+        'sentiment_distribution': {
+            'positive': len(positive_words),
+            'negative': len(negative_words),
+            'neutral': len(word_scores) - len(positive_words) - len(negative_words)
+        },
+        'top_words': {
+            'positive': positive_words,
+            'negative': negative_words
+        },
+        'word_analysis': word_scores,
+        'sentiment_patterns': {'rolling_sentiment': [], 'sentiment_changes': []},
+        'segment_analysis': [],
+        'theme_analysis': {},
+        'text_metrics': {
+            'original': raw_text,
+            'cleaned': cleaned_text,
+            'lower': cleaned_text.lower(),
+            'preserved_elements': {},
+            'readability_score': None,
+            'grade_level': None,
+            'readability_note': 'Not calculated in simplified mode',
+            'word_count': len(tokens),
+            'sentence_count': len(sent_tokenize(raw_text))
+        }
+    }
+    
     return results_data, config
 
 def display_streamlit_results(results_data, config):
@@ -1063,10 +1133,17 @@ def display_streamlit_results(results_data, config):
     # Create and display visualizations
     create_streamlit_visualizations(results_data, config)
     
+    # Marketing Research Insights Section
+    st.markdown("---")
+    st.header("🎯 Marketing Research Insights")
+    
+    with st.expander("💼 Key Findings for Marketing Strategy - Click to expand", expanded=True):
+        display_marketing_insights(results_data, config)
+    
     # Methodology notes
     with st.expander("⚠️ Methodology & Limitations - Click to expand"):
-        display_methodology_notes(config)
-    
+            display_methodology_notes(config)
+
     # Footer
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -1084,18 +1161,52 @@ def display_streamlit_results(results_data, config):
 def create_streamlit_visualizations(results_data, config):
     """Create Streamlit-compatible visualizations"""
     
-    # Sentiment distribution pie chart
+    # Sentiment distribution pie chart - smaller size
     st.subheader("📊 Sentiment Distribution")
     
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sentiment_counts = results_data['sentiment_distribution']
-    labels = ['Positive', 'Negative', 'Neutral']
-    sizes = [sentiment_counts['positive'], sentiment_counts['negative'], sentiment_counts['neutral']]
-    colors = ['#2E8B57', '#DC143C', '#708090']
+    col1, col2 = st.columns([1, 2])
     
-    ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors)
-    ax.set_title('Overall Sentiment Distribution')
-    st.pyplot(fig)
+    with col1:
+        fig, ax = plt.subplots(figsize=(5, 5))
+        sentiment_counts = results_data['sentiment_distribution']
+        labels = ['Positive', 'Negative', 'Neutral']
+        sizes = [sentiment_counts['positive'], sentiment_counts['negative'], sentiment_counts['neutral']]
+        colors = ['#2E8B57', '#DC143C', '#708090']
+        
+        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors)
+        ax.set_title('Overall Sentiment Distribution')
+        st.pyplot(fig)
+    
+    with col2:
+        # Marketing insights based on distribution
+        st.markdown("**📊 Marketing Insights:**")
+        
+        total = sum(sizes)
+        pos_pct = (sizes[0] / total * 100) if total > 0 else 0
+        neg_pct = (sizes[1] / total * 100) if total > 0 else 0
+        neu_pct = (sizes[2] / total * 100) if total > 0 else 0
+        
+        # Sentiment balance insight
+        if pos_pct > 60:
+            st.success(f"✅ **Strong Positive Sentiment** ({pos_pct:.1f}%)")
+            st.write("• High customer satisfaction or brand affinity")
+            st.write("• Good candidate for testimonials and case studies")
+            st.write("• Leverage positive language in marketing copy")
+        elif pos_pct > 40:
+            st.info(f"📊 **Balanced Positive** ({pos_pct:.1f}%)")
+            st.write("• Generally favorable reception")
+            st.write("• Focus on amplifying positive aspects")
+            st.write("• Address neutral feedback to convert to positive")
+        elif neg_pct > 40:
+            st.error(f"⚠️ **High Negative Sentiment** ({neg_pct:.1f}%)")
+            st.write("• Critical pain points need immediate attention")
+            st.write("• Potential crisis management situation")
+            st.write("• Prioritize addressing top negative themes")
+        else:
+            st.warning(f"⚪ **Neutral/Mixed Sentiment** (Neu: {neu_pct:.1f}%)")
+            st.write("• Opportunity to strengthen brand messaging")
+            st.write("• Focus on emotional engagement strategies")
+            st.write("• Conduct deeper qualitative research")
     
     # Top sentiment words bar chart
     st.subheader("🔍 Top Sentiment Words")
@@ -1269,6 +1380,263 @@ def display_enhanced_results(results_data, config):
         print(f"🎓 Grade Level: {metrics['grade_level']:.1f}")
 
     print(f"🔧 Analysis optimized for: {config.material_type.upper()}")
+
+def display_marketing_insights(results_data, config):
+    """Display actionable marketing research insights"""
+    
+    overall = results_data['overall_sentiment']
+    distribution = results_data['sentiment_distribution']
+    top_positive = results_data['top_words']['positive'][:10]
+    top_negative = results_data['top_words']['negative'][:10]
+    themes = results_data.get('theme_analysis', {})
+    
+    # Calculate key metrics
+    total_words = sum(distribution.values())
+    pos_pct = (distribution['positive'] / total_words * 100) if total_words > 0 else 0
+    neg_pct = (distribution['negative'] / total_words * 100) if total_words > 0 else 0
+    
+    # 1. Voice of Customer (VOC) Analysis
+    st.subheader("🗣️ Voice of Customer (VOC) Analysis")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**💬 What Customers Are Saying:**")
+        
+        # Extract top emotional drivers
+        if top_positive:
+            st.write("**Top Positive Drivers:**")
+            for i, word in enumerate(top_positive[:5], 1):
+                st.write(f"{i}. **{word['word']}** (mentioned {word['count']}x) - Score: {word['score']:.2f}")
+        
+        if top_negative:
+            st.write("\n**Top Pain Points:**")
+            for i, word in enumerate(top_negative[:5], 1):
+                st.write(f"{i}. **{word['word']}** (mentioned {word['count']}x) - Score: {word['score']:.2f}")
+    
+    with col2:
+        st.markdown("**📊 Actionable Recommendations:**")
+        
+        if pos_pct > 60:
+            st.success("**Leverage Success:**")
+            st.write("• Create testimonial campaigns featuring positive language")
+            st.write("• Use top positive words in ad copy and landing pages")
+            st.write("• Develop case studies highlighting success stories")
+        elif neg_pct > 30:
+            st.error("**Address Pain Points:**")
+            st.write("• Prioritize fixing issues related to negative keywords")
+            st.write("• Create FAQ/support content addressing concerns")
+            st.write("• Develop messaging to counter negative perceptions")
+        else:
+            st.info("**Optimize Messaging:**")
+            st.write("• Strengthen emotional connection in communications")
+            st.write("• Test different value propositions")
+            st.write("• Conduct A/B testing with sentiment-driven copy")
+    
+    # 2. Brand Perception & Positioning
+    st.markdown("---")
+    st.subheader("🎨 Brand Perception & Positioning")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🔍 Current Brand Perception:**")
+        
+        if overall['label'] == 'positive':
+            st.success(f"✅ **Positive Brand Sentiment** (Score: {overall['score']:.2f})")
+            st.write("**Strengths:**")
+            st.write("• Strong brand affinity and customer satisfaction")
+            st.write("• Positive word-of-mouth potential")
+            st.write("• Foundation for premium positioning")
+        elif overall['label'] == 'negative':
+            st.error(f"⚠️ **Negative Brand Sentiment** (Score: {overall['score']:.2f})")
+            st.write("**Challenges:**")
+            st.write("• Brand reputation at risk")
+            st.write("• Customer retention concerns")
+            st.write("• Immediate intervention required")
+        else:
+            st.warning(f"⚪ **Neutral Brand Sentiment** (Score: {overall['score']:.2f})")
+            st.write("**Opportunities:**")
+            st.write("• Lack of strong emotional connection")
+            st.write("• Room for differentiation")
+            st.write("• Build distinctive brand personality")
+    
+    with col2:
+        st.markdown("**💡 Strategic Positioning Insights:**")
+        
+        # Analyze themes for positioning
+        if themes:
+            st.write("**Key Themes for Messaging:**")
+            sorted_themes = sorted(themes.items(), 
+                                 key=lambda x: x[1]['total_count'], 
+                                 reverse=True)[:3]
+            
+            for theme, data in sorted_themes:
+                sentiment_label = data.get('dominant_sentiment', 'neutral')
+                emoji = "✅" if sentiment_label == 'positive' else "❌" if sentiment_label == 'negative' else "⚪"
+                st.write(f"{emoji} **{theme.title()}**: {data['total_count']} mentions ({sentiment_label})")
+        
+        st.write("\n**Positioning Recommendations:**")
+        if pos_pct > 60:
+            st.write("• Position as premium/trusted solution")
+            st.write("• Emphasize quality and reliability")
+        elif neg_pct > 40:
+            st.write("• Focus on value and problem-solving")
+            st.write("• Address concerns transparently")
+        else:
+            st.write("• Differentiate through unique benefits")
+            st.write("• Build emotional brand story")
+    
+    # 3. Content Strategy & Messaging
+    st.markdown("---")
+    st.subheader("✍️ Content Strategy & Messaging Opportunities")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**📝 Content Ideas from Analysis:**")
+        
+        if config.material_type == 'reviews':
+            st.write("**Customer Review Analysis:**")
+            st.write("• Create 'Top Customer Stories' blog series")
+            st.write("• Address common questions in video content")
+            st.write("• Develop comparison guides addressing concerns")
+        elif config.material_type == 'social_media':
+            st.write("**Social Media Intelligence:**")
+            st.write("• Create engagement campaigns around positive themes")
+            st.write("• Develop crisis response for negative sentiment")
+            st.write("• Identify influencer collaboration opportunities")
+        elif config.material_type == 'news':
+            st.write("**Media Perception Analysis:**")
+            st.write("• Develop PR strategy addressing negative coverage")
+            st.write("• Pitch positive story angles to journalists")
+            st.write("• Create thought leadership content")
+        else:
+            st.write("**General Content Opportunities:**")
+            st.write("• Feature customer success stories")
+            st.write("• Create educational content addressing pain points")
+            st.write("• Develop brand storytelling campaigns")
+    
+    with col2:
+        st.markdown("**🎯 Messaging Framework:**")
+        
+        # Extract messaging keywords
+        if top_positive and top_negative:
+            st.write("**Power Words to Use:**")
+            power_words = [w['word'] for w in top_positive[:5]]
+            st.write(", ".join(power_words))
+            
+            st.write("\n**Words to Avoid/Address:**")
+            avoid_words = [w['word'] for w in top_negative[:5]]
+            st.write(", ".join(avoid_words))
+            
+            st.write("\n**Messaging Priority:**")
+            if pos_pct > neg_pct * 2:
+                st.write("1. Amplify positive attributes")
+                st.write("2. Maintain consistency")
+                st.write("3. Monitor for emerging issues")
+            elif neg_pct > pos_pct:
+                st.write("1. Address negative perceptions first")
+                st.write("2. Rebuild trust through transparency")
+                st.write("3. Gradually introduce positive messaging")
+            else:
+                st.write("1. Balance problem-solution messaging")
+                st.write("2. Differentiate from competitors")
+                st.write("3. Build emotional connection")
+    
+    # 4. Customer Segmentation & Targeting
+    st.markdown("---")
+    st.subheader("👥 Customer Segmentation Insights")
+    
+    sentiment_patterns = results_data.get('sentiment_patterns', {})
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**📊 Sentiment Patterns:**")
+        
+        if sentiment_patterns.get('rolling_sentiment'):
+            rolling = sentiment_patterns['rolling_sentiment']
+            avg_sentiment = sum(rolling) / len(rolling) if rolling else 0
+            
+            if len(rolling) > 1:
+                trend = "improving" if rolling[-1] > rolling[0] else "declining" if rolling[-1] < rolling[0] else "stable"
+                st.write(f"**Sentiment Trend:** {trend.title()}")
+                
+                if trend == "improving":
+                    st.success("• Positive momentum - capitalize on it!")
+                    st.write("• Launch new campaigns or product releases")
+                    st.write("• Increase marketing investment")
+                elif trend == "declining":
+                    st.error("• Negative trend - investigate root causes")
+                    st.write("• Conduct immediate customer research")
+                    st.write("• Implement retention strategies")
+        
+        st.write("\n**Recommended Segments:**")
+        if pos_pct > 60:
+            st.write("🟢 **Promoters**: Leverage for referrals")
+            st.write("🟡 **Satisfied**: Upsell opportunities")
+        if neg_pct > 20:
+            st.write("🔴 **Detractors**: Win-back campaigns")
+    
+    with col2:
+        st.markdown("**🎯 Targeting Strategy:**")
+        
+        st.write("**Campaign Recommendations:**")
+        
+        if config.material_type == 'reviews':
+            st.write("• **Email Campaign**: Request reviews from satisfied customers")
+            st.write("• **Retargeting**: Address concerns of neutral reviewers")
+            st.write("• **Loyalty Program**: Reward positive advocates")
+        elif config.material_type == 'social_media':
+            st.write("• **Influencer Campaign**: Partner with positive voices")
+            st.write("• **Community Building**: Engage with active participants")
+            st.write("• **Paid Social**: Target similar positive audiences")
+        else:
+            st.write("• **Personalization**: Tailor messaging by sentiment group")
+            st.write("• **A/B Testing**: Test emotional vs. rational appeals")
+            st.write("• **Retargeting**: Re-engage neutral/negative audiences")
+        
+        st.write("\n**Quick Win Actions:**")
+        st.write("1. Create urgency with limited-time offers for neutrals")
+        st.write("2. Showcase social proof from positive feedback")
+        st.write("3. Develop FAQ addressing top negative concerns")
+    
+    # 5. Competitive Intelligence (if applicable)
+    st.markdown("---")
+    st.subheader("🔍 Competitive & Market Intelligence")
+    
+    st.markdown("**💼 Strategic Insights:**")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Market Opportunities:**")
+        
+        if pos_pct > 50:
+            st.write("• **Strength**: Use positive sentiment as competitive differentiator")
+            st.write("• **Tactic**: Create 'Why customers choose us' campaigns")
+            st.write("• **Channel**: Emphasize in sales enablement materials")
+        
+        if themes:
+            st.write("\n**Unmet Needs Analysis:**")
+            neutral_themes = [t for t, d in themes.items() if d.get('dominant_sentiment') == 'neutral']
+            if neutral_themes:
+                st.write(f"• Explore positioning around: {', '.join(neutral_themes[:3])}")
+    
+    with col2:
+        st.markdown("**Risk Mitigation:**")
+        
+        if neg_pct > 30:
+            st.write("• **Alert**: Negative sentiment could impact market share")
+            st.write("• **Action**: Benchmark against competitor sentiment")
+            st.write("• **Monitor**: Set up sentiment tracking dashboard")
+        
+        st.write("\n**Next Steps for Research:**")
+        st.write("1. Conduct competitive sentiment analysis")
+        st.write("2. Survey customers on key themes identified")
+        st.write("3. Test messaging variations based on insights")
+        st.write("4. Track sentiment changes over time")
 
 def display_methodology_notes(config):
     """Display enhanced methodology and limitations"""
