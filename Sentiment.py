@@ -35,9 +35,9 @@ st.set_page_config(
 # Download NLTK resources
 @st.cache_resource
 def download_nltk_data():
-    nltk.download('vader_lexicon')
-    nltk.download('punkt_tab')
-    nltk.download('stopwords')
+    nltk.download('vader_lexicon', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
+    nltk.download('stopwords', quiet=True)
 
 download_nltk_data()
 
@@ -161,10 +161,10 @@ class AnalysisConfig:
 
         # Detection patterns
         patterns = {
-            'novel': [r'chapter\s+\d+', r'he said|she said', r'protagonist', r'character'],
+            'novel': [r'chapter\s+\d+', r'he said|she said', r'she said|he said', r'protagonist', r'character', r'\bbook\b'],
             'news': [r'\w+\s+\(reuters\)', r'breaking:', r'reported', r'according to'],
             'reviews': [r'rating:', r'stars', r'\/5', r'recommend', r'pros:', r'cons:'],
-            'social_media': [r'#\w+', r'@\w+', r'lol', r'omg', r'rt\s+@'],
+            'social_media': [r'#\w+', r'@\w+', r'lol', r'omg', r'rt\s+@', r'\blol\b', r'\bomg\b'],
             'academic': [r'abstract', r'methodology', r'hypothesis', r'references', r'et al'],
             'articles': [r'published', r'journalist', r'editor', r'source']
         }
@@ -174,13 +174,20 @@ class AnalysisConfig:
             score = sum(len(re.findall(pattern, text_lower, re.IGNORECASE)) for pattern in pattern_list)
             scores[material_type] = score
 
-        # Additional heuristics
-        if word_count > 10000:
-            scores['novel'] += 2
+        # Additional heuristics - stronger weighting
+        if word_count > 50000:
+            scores['novel'] += 10  # Very likely a novel
+        elif word_count > 10000:
+            scores['novel'] += 5
         elif word_count < 500:
-            scores['social_media'] += 1
+            scores['social_media'] += 2
+        
+        # Check for dialogue patterns (strong indicator of fiction)
+        dialogue_count = len(re.findall(r'"[^"]{10,}"', text_sample))
+        if dialogue_count > 10:
+            scores['novel'] += 5
 
-        detected_type = max(scores, key=scores.get) if max(scores.values()) > 0 else 'articles'
+        detected_type = max(scores, key=scores.get) if max(scores.values()) > 0 else 'novel'
         self.auto_detected_type = detected_type
 
         return detected_type
@@ -252,7 +259,14 @@ def enhanced_preprocess_text(text, config):
 # ----------------------
 def get_enhanced_word_sentiments(text_data, config):
     """Enhanced word-level sentiment analysis with better context handling"""
+    # Limit tokens for performance
+    max_tokens = 10000
     tokens = word_tokenize(text_data['original'])
+    
+    if len(tokens) > max_tokens:
+        st.warning(f"⚠️ Text is very long ({len(tokens):,} tokens). Analyzing first {max_tokens:,} tokens for performance.")
+        tokens = tokens[:max_tokens]
+    
     word_details = defaultdict(lambda: {
         'score': 0, 'count': 0, 'positions': [], 'contexts': [],
         'sentence_positions': [], 'co_occurring_words': []
@@ -671,99 +685,128 @@ def main():
         if len(raw_text.strip()) < 10:
             st.warning("Please enter more text for meaningful analysis.")
             return
+        
+        # Warn about large files
+        word_count = len(raw_text.split())
+        if word_count > 10000:
+            st.warning(f"⚠️ Large text detected ({word_count:,} words). Analysis may take 1-2 minutes. For faster results, consider analyzing a shorter excerpt.")
             
-        with st.spinner("Analyzing text..."):
-            try:
-                # Run analysis
-                results_data, config = run_sentiment_analysis(raw_text, material_type)
-                
-                # Display results
-                display_streamlit_results(results_data, config)
-                
-            except Exception as e:
-                st.error(f"Error during analysis: {e}")
-                st.exception(e)
+        # Create progress indicators
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        try:
+            # Step 1: Initialize
+            status_text.text("🚀 Initializing analysis...")
+            progress_bar.progress(10)
+            
+            # Step 2: Detect material type
+            status_text.text("🔍 Auto-detecting material type...")
+            progress_bar.progress(20)
+            
+            # Step 3: Run analysis with progress
+            status_text.text("📊 Analyzing sentiment (this may take a moment for large texts)...")
+            progress_bar.progress(30)
+            
+            results_data, config = run_sentiment_analysis(raw_text, material_type)
+            
+            # Step 4: Complete
+            status_text.text("✅ Analysis complete!")
+            progress_bar.progress(100)
+            
+            # Clear progress indicators
+            progress_bar.empty()
+            status_text.empty()
+            
+            # Display results
+            display_streamlit_results(results_data, config)
+            
+        except Exception as e:
+            progress_bar.empty()
+            status_text.empty()
+            st.error(f"Error during analysis: {e}")
+            st.exception(e)
 
 def run_sentiment_analysis(raw_text, material_type):
     """Run the sentiment analysis and return results"""
-    
-    # Auto-detect material type or use specified type
+
+            # Auto-detect material type or use specified type
     config = AnalysisConfig(material_type)
     if material_type == 'auto':
-        detected_type = config.auto_detect_material_type(raw_text[:2000])  # Sample first 2000 chars
-        config.update_for_detected_type(detected_type)
+            detected_type = config.auto_detect_material_type(raw_text[:2000])  # Sample first 2000 chars
+            config.update_for_detected_type(detected_type)
 
-    # Enhanced preprocessing
-    processed_text = enhanced_preprocess_text(raw_text, config)
+            # Enhanced preprocessing
+            processed_text = enhanced_preprocess_text(raw_text, config)
 
-    # Run enhanced analyses
-    sia = SentimentIntensityAnalyzer()
-    overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
-    word_analysis = get_enhanced_word_sentiments(processed_text, config)
-    sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
-    segment_analysis = enhanced_segment_analysis(processed_text, config)
+            # Run enhanced analyses
+            sia = SentimentIntensityAnalyzer()
+            overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
+            word_analysis = get_enhanced_word_sentiments(processed_text, config)
+            sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
+            segment_analysis = enhanced_segment_analysis(processed_text, config)
 
-    # Separate positive and negative words
-    positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
-                           key=lambda x: (x['score'], x['count']), reverse=True)
-    negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
-                           key=lambda x: (x['score'], x['count']))
+            # Separate positive and negative words
+            positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
+                                   key=lambda x: (x['score'], x['count']), reverse=True)
+            negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
+                                   key=lambda x: (x['score'], x['count']))
 
-    # Theme analysis
-    theme_analysis = defaultdict(lambda: {
-        'positive_count': 0, 'negative_count': 0, 'total_count': 0,
-        'key_words': set(), 'dominant_sentiment': 'neutral'
-    })
+            # Theme analysis
+            theme_analysis = defaultdict(lambda: {
+                'positive_count': 0, 'negative_count': 0, 'total_count': 0,
+                'key_words': set(), 'dominant_sentiment': 'neutral'
+            })
 
-    for word_data in word_analysis:
-        word = word_data['word']
-        for theme, keywords in config.THEME_CODEBOOK.items():
-            if word in keywords:
-                theme_analysis[theme]['total_count'] += word_data['count']
-                theme_analysis[theme]['key_words'].add(word)
-                if word_data['score'] > config.POSITIVE_THRESHOLD:
-                    theme_analysis[theme]['positive_count'] += word_data['count']
-                elif word_data['score'] < config.NEGATIVE_THRESHOLD:
-                    theme_analysis[theme]['negative_count'] += word_data['count']
+            for word_data in word_analysis:
+                word = word_data['word']
+                for theme, keywords in config.THEME_CODEBOOK.items():
+                    if word in keywords:
+                        theme_analysis[theme]['total_count'] += word_data['count']
+                        theme_analysis[theme]['key_words'].add(word)
+                        if word_data['score'] > config.POSITIVE_THRESHOLD:
+                            theme_analysis[theme]['positive_count'] += word_data['count']
+                        elif word_data['score'] < config.NEGATIVE_THRESHOLD:
+                            theme_analysis[theme]['negative_count'] += word_data['count']
 
-    # Convert sets to lists and determine dominant sentiment
-    for theme, data in theme_analysis.items():
-        data['key_words'] = list(data['key_words'])
-        if data['positive_count'] > data['negative_count']:
-            data['dominant_sentiment'] = 'positive'
-        elif data['negative_count'] > data['positive_count']:
-            data['dominant_sentiment'] = 'negative'
+            # Convert sets to lists and determine dominant sentiment
+            for theme, data in theme_analysis.items():
+                data['key_words'] = list(data['key_words'])
+                if data['positive_count'] > data['negative_count']:
+                    data['dominant_sentiment'] = 'positive'
+                elif data['negative_count'] > data['positive_count']:
+                    data['dominant_sentiment'] = 'negative'
 
-    # Calculate sentiment distribution
-    total_words = len(word_analysis)
-    positive_count = len(positive_words)
-    negative_count = len(negative_words)
-    neutral_count = total_words - positive_count - negative_count
+            # Calculate sentiment distribution
+            total_words = len(word_analysis)
+            positive_count = len(positive_words)
+            negative_count = len(negative_words)
+            neutral_count = total_words - positive_count - negative_count
 
-    # Compile results
-    results_data = {
-        'overall_sentiment': {
-            'score': overall_sentiment['compound'],
-            'label': 'positive' if overall_sentiment['compound'] > config.POSITIVE_THRESHOLD
-                    else 'negative' if overall_sentiment['compound'] < config.NEGATIVE_THRESHOLD
-                    else 'neutral',
-            'confidence': max(overall_sentiment['pos'], overall_sentiment['neg'], overall_sentiment['neu'])
-        },
-        'sentiment_distribution': {
-            'positive': positive_count,
-            'negative': negative_count,
-            'neutral': neutral_count
-        },
-        'top_words': {
-            'positive': positive_words[:20],
-            'negative': negative_words[:20]
-        },
-        'word_analysis': word_analysis,
-        'sentiment_patterns': sentiment_patterns,
-        'segment_analysis': segment_analysis,
-        'theme_analysis': dict(theme_analysis),
-        'text_metrics': processed_text
-    }
+            # Compile results
+            results_data = {
+                'overall_sentiment': {
+                    'score': overall_sentiment['compound'],
+                    'label': 'positive' if overall_sentiment['compound'] > config.POSITIVE_THRESHOLD
+                            else 'negative' if overall_sentiment['compound'] < config.NEGATIVE_THRESHOLD
+                            else 'neutral',
+                    'confidence': max(overall_sentiment['pos'], overall_sentiment['neg'], overall_sentiment['neu'])
+                },
+                'sentiment_distribution': {
+                    'positive': positive_count,
+                    'negative': negative_count,
+                    'neutral': neutral_count
+                },
+                'top_words': {
+                    'positive': positive_words[:20],
+                    'negative': negative_words[:20]
+                },
+                'word_analysis': word_analysis,
+                'sentiment_patterns': sentiment_patterns,
+                'segment_analysis': segment_analysis,
+                'theme_analysis': dict(theme_analysis),
+                'text_metrics': processed_text
+            }
 
     return results_data, config
 
@@ -908,7 +951,7 @@ def display_streamlit_results(results_data, config):
     
     # Methodology notes
     with st.expander("⚠️ Methodology & Limitations"):
-        display_methodology_notes(config)
+            display_methodology_notes(config)
 
 def create_streamlit_visualizations(results_data, config):
     """Create Streamlit-compatible visualizations"""
