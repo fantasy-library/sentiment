@@ -729,84 +729,84 @@ def main():
 
 def run_sentiment_analysis(raw_text, material_type):
     """Run the sentiment analysis and return results"""
-
-            # Auto-detect material type or use specified type
+    
+    # Auto-detect material type or use specified type
     config = AnalysisConfig(material_type)
     if material_type == 'auto':
-            detected_type = config.auto_detect_material_type(raw_text[:2000])  # Sample first 2000 chars
-            config.update_for_detected_type(detected_type)
+        detected_type = config.auto_detect_material_type(raw_text[:2000])  # Sample first 2000 chars
+        config.update_for_detected_type(detected_type)
 
-            # Enhanced preprocessing
-            processed_text = enhanced_preprocess_text(raw_text, config)
+    # Enhanced preprocessing
+    processed_text = enhanced_preprocess_text(raw_text, config)
 
-            # Run enhanced analyses
-            sia = SentimentIntensityAnalyzer()
-            overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
-            word_analysis = get_enhanced_word_sentiments(processed_text, config)
-            sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
-            segment_analysis = enhanced_segment_analysis(processed_text, config)
+    # Run enhanced analyses
+    sia = SentimentIntensityAnalyzer()
+    overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
+    word_analysis = get_enhanced_word_sentiments(processed_text, config)
+    sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
+    segment_analysis = enhanced_segment_analysis(processed_text, config)
 
-            # Separate positive and negative words
-            positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
-                                   key=lambda x: (x['score'], x['count']), reverse=True)
-            negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
-                                   key=lambda x: (x['score'], x['count']))
+    # Separate positive and negative words
+    positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
+                           key=lambda x: (x['score'], x['count']), reverse=True)
+    negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
+                           key=lambda x: (x['score'], x['count']))
 
-            # Theme analysis
-            theme_analysis = defaultdict(lambda: {
-                'positive_count': 0, 'negative_count': 0, 'total_count': 0,
-                'key_words': set(), 'dominant_sentiment': 'neutral'
-            })
+    # Theme analysis
+    theme_analysis = defaultdict(lambda: {
+        'positive_count': 0, 'negative_count': 0, 'total_count': 0,
+        'key_words': set(), 'dominant_sentiment': 'neutral'
+    })
 
-            for word_data in word_analysis:
-                word = word_data['word']
-                for theme, keywords in config.THEME_CODEBOOK.items():
-                    if word in keywords:
-                        theme_analysis[theme]['total_count'] += word_data['count']
-                        theme_analysis[theme]['key_words'].add(word)
-                        if word_data['score'] > config.POSITIVE_THRESHOLD:
-                            theme_analysis[theme]['positive_count'] += word_data['count']
-                        elif word_data['score'] < config.NEGATIVE_THRESHOLD:
-                            theme_analysis[theme]['negative_count'] += word_data['count']
+    for word_data in word_analysis:
+        word = word_data['word']
+        for theme, keywords in config.THEME_CODEBOOK.items():
+            if word in keywords:
+                theme_analysis[theme]['total_count'] += word_data['count']
+                theme_analysis[theme]['key_words'].add(word)
+                if word_data['score'] > config.POSITIVE_THRESHOLD:
+                    theme_analysis[theme]['positive_count'] += word_data['count']
+                elif word_data['score'] < config.NEGATIVE_THRESHOLD:
+                    theme_analysis[theme]['negative_count'] += word_data['count']
 
-            # Convert sets to lists and determine dominant sentiment
-            for theme, data in theme_analysis.items():
-                data['key_words'] = list(data['key_words'])
-                if data['positive_count'] > data['negative_count']:
-                    data['dominant_sentiment'] = 'positive'
-                elif data['negative_count'] > data['positive_count']:
-                    data['dominant_sentiment'] = 'negative'
+    # Convert sets to lists and determine dominant sentiment
+    for theme, data in theme_analysis.items():
+        data['key_words'] = list(data['key_words'])
+        if data['positive_count'] > data['negative_count']:
+            data['dominant_sentiment'] = 'positive'
+        elif data['negative_count'] > data['positive_count']:
+            data['dominant_sentiment'] = 'negative'
 
-            # Calculate sentiment distribution
-            total_words = len(word_analysis)
-            positive_count = len(positive_words)
-            negative_count = len(negative_words)
-            neutral_count = total_words - positive_count - negative_count
+    # Calculate sentiment distribution
+    total_words = len(word_analysis)
+    positive_count = len(positive_words)
+    negative_count = len(negative_words)
+    neutral_count = total_words - positive_count - negative_count
 
-            # Compile results
-            results_data = {
-                'overall_sentiment': {
-                    'score': overall_sentiment['compound'],
-                    'label': 'positive' if overall_sentiment['compound'] > config.POSITIVE_THRESHOLD
-                            else 'negative' if overall_sentiment['compound'] < config.NEGATIVE_THRESHOLD
-                            else 'neutral',
-                    'confidence': max(overall_sentiment['pos'], overall_sentiment['neg'], overall_sentiment['neu'])
-                },
-                'sentiment_distribution': {
-                    'positive': positive_count,
-                    'negative': negative_count,
-                    'neutral': neutral_count
-                },
-                'top_words': {
-                    'positive': positive_words[:20],
-                    'negative': negative_words[:20]
-                },
-                'word_analysis': word_analysis,
-                'sentiment_patterns': sentiment_patterns,
-                'segment_analysis': segment_analysis,
-                'theme_analysis': dict(theme_analysis),
-                'text_metrics': processed_text
-            }
+    # Compile results
+    results_data = {
+        'overall_sentiment': {
+            'score': overall_sentiment['compound'],
+            'label': 'positive' if overall_sentiment['compound'] > config.POSITIVE_THRESHOLD
+                    else 'negative' if overall_sentiment['compound'] < config.NEGATIVE_THRESHOLD
+                    else 'neutral',
+            'confidence': max(overall_sentiment['pos'], overall_sentiment['neg'], overall_sentiment['neu'])
+        },
+        'sentiment_distribution': {
+            'positive': positive_count,
+            'negative': negative_count,
+            'neutral': neutral_count
+        },
+        'top_words': {
+            'positive': positive_words[:20],
+            'negative': negative_words[:20]
+        },
+        'word_analysis': word_analysis,
+        'sentiment_patterns': sentiment_patterns,
+        'segment_analysis': segment_analysis,
+        'theme_analysis': dict(theme_analysis),
+        'text_metrics': processed_text
+    }
 
     return results_data, config
 
