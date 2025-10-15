@@ -216,14 +216,14 @@ def enhanced_preprocess_text(text, config):
     if config.material_type == 'social_media':
         # Preserve hashtags and mentions but clean URLs
         text = re.sub(r'http\S+|www\S+', '[URL]', text)
-        cleaned_text = re.sub(r"[^\w\s''-#@]", ' ', text)
+        cleaned_text = re.sub(r"[^\w\s'#@-]", ' ', text)
     elif config.material_type == 'news':
         # Remove bylines and timestamps
         text = re.sub(r'\([A-Z]+\)\s*-?', '', text)  # Remove (REUTERS), (AP) etc.
-        cleaned_text = re.sub(r"[^\w\s''-]", ' ', text)
+        cleaned_text = re.sub(r"[^\w\s'-]", ' ', text)
     else:
         # General cleaning
-        cleaned_text = re.sub(r"[^\w\s''-]", ' ', text)
+        cleaned_text = re.sub(r"[^\w\s'-]", ' ', text)
 
     # Normalize whitespace
     cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
