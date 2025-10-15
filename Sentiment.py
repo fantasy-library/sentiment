@@ -843,15 +843,15 @@ def run_sentiment_analysis(raw_text, material_type):
         if material_type in config.MATERIAL_PRESETS:
             config._apply_preset(material_type)
 
-            # Enhanced preprocessing
-            processed_text = enhanced_preprocess_text(raw_text, config)
+    # Enhanced preprocessing
+    processed_text = enhanced_preprocess_text(raw_text, config)
 
-            # Run enhanced analyses
-            sia = SentimentIntensityAnalyzer()
-            overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
-            word_analysis = get_enhanced_word_sentiments(processed_text, config)
-            sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
-            segment_analysis = enhanced_segment_analysis(processed_text, config)
+    # Run enhanced analyses
+    sia = SentimentIntensityAnalyzer()
+    overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
+    word_analysis = get_enhanced_word_sentiments(processed_text, config)
+    sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
+    segment_analysis = enhanced_segment_analysis(processed_text, config)
 
     # Separate positive and negative words
     positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
@@ -940,6 +940,7 @@ def run_simple_sentiment_analysis(raw_text, material_type):
                     'word': token,
                     'score': score['compound'],
                     'count': 1,
+                    'frequency': 1 / len(tokens) * 100,
                     'positions': [],
                     'contexts': [],
                     'sentence_positions': [],
