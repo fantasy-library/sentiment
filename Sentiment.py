@@ -790,23 +790,13 @@ def main():
             progress_bar.empty()
             status_text.empty()
             st.error(f"❌ Error during analysis: {str(e)}")
-            
-            # Try simple fallback analysis
-            with st.expander("🔧 Attempting simplified analysis..."):
-                try:
-                    st.info("Running basic sentiment analysis as fallback...")
-                    fallback_results, fallback_config = run_simple_sentiment_analysis(raw_text, material_type)
-                    st.success("✅ Simplified analysis completed!")
-                    display_streamlit_results(fallback_results, fallback_config)
-                except Exception as fallback_error:
-                    st.error(f"Simplified analysis also failed: {str(fallback_error)}")
-                    st.write("**Troubleshooting tips:**")
-                    st.write("• Try a shorter text excerpt")
-                    st.write("• Ensure text is primarily English")
-                    st.write("• Check for unusual characters or formatting")
-                    st.write("• Try selecting a specific material type instead of auto-detect")
-                    with st.expander("📋 Full error details"):
-                        st.exception(e)
+            st.write("**Troubleshooting tips:**")
+            st.write("• Try a shorter text excerpt")
+            st.write("• Ensure text is primarily English")
+            st.write("• Check for unusual characters or formatting")
+            st.write("• Try selecting a specific material type instead of auto-detect")
+            with st.expander("📋 Full error details"):
+                st.exception(e)
     else:
         # Show helpful empty state
         if not raw_text:
@@ -843,51 +833,51 @@ def run_sentiment_analysis(raw_text, material_type):
         if material_type in config.MATERIAL_PRESETS:
             config._apply_preset(material_type)
 
-    # Enhanced preprocessing
-    processed_text = enhanced_preprocess_text(raw_text, config)
+            # Enhanced preprocessing
+            processed_text = enhanced_preprocess_text(raw_text, config)
 
-    # Run enhanced analyses
-    sia = SentimentIntensityAnalyzer()
-    overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
-    word_analysis = get_enhanced_word_sentiments(processed_text, config)
-    sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
-    segment_analysis = enhanced_segment_analysis(processed_text, config)
+            # Run enhanced analyses
+            sia = SentimentIntensityAnalyzer()
+            overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
+            word_analysis = get_enhanced_word_sentiments(processed_text, config)
+            sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
+            segment_analysis = enhanced_segment_analysis(processed_text, config)
 
-    # Separate positive and negative words
-    positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
-                           key=lambda x: (x['score'], x['count']), reverse=True)
-    negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
-                           key=lambda x: (x['score'], x['count']))
+            # Separate positive and negative words
+            positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
+                                   key=lambda x: (x['score'], x['count']), reverse=True)
+            negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
+                                   key=lambda x: (x['score'], x['count']))
 
-    # Theme analysis
-    theme_analysis = defaultdict(lambda: {
-        'positive_count': 0, 'negative_count': 0, 'total_count': 0,
-        'key_words': set(), 'dominant_sentiment': 'neutral'
-    })
+            # Theme analysis
+            theme_analysis = defaultdict(lambda: {
+                'positive_count': 0, 'negative_count': 0, 'total_count': 0,
+                'key_words': set(), 'dominant_sentiment': 'neutral'
+            })
 
-    for word_data in word_analysis:
-        word = word_data['word']
-        for theme, keywords in config.THEME_CODEBOOK.items():
-            if word in keywords:
-                theme_analysis[theme]['total_count'] += word_data['count']
-                theme_analysis[theme]['key_words'].add(word)
-                if word_data['score'] > config.POSITIVE_THRESHOLD:
-                    theme_analysis[theme]['positive_count'] += word_data['count']
-                elif word_data['score'] < config.NEGATIVE_THRESHOLD:
-                    theme_analysis[theme]['negative_count'] += word_data['count']
+            for word_data in word_analysis:
+                word = word_data['word']
+                for theme, keywords in config.THEME_CODEBOOK.items():
+                    if word in keywords:
+                        theme_analysis[theme]['total_count'] += word_data['count']
+                        theme_analysis[theme]['key_words'].add(word)
+                        if word_data['score'] > config.POSITIVE_THRESHOLD:
+                            theme_analysis[theme]['positive_count'] += word_data['count']
+                        elif word_data['score'] < config.NEGATIVE_THRESHOLD:
+                            theme_analysis[theme]['negative_count'] += word_data['count']
 
-    # Convert sets to lists and determine dominant sentiment
-    for theme, data in theme_analysis.items():
-        data['key_words'] = list(data['key_words'])
-        if data['positive_count'] > data['negative_count']:
-            data['dominant_sentiment'] = 'positive'
-        elif data['negative_count'] > data['positive_count']:
-            data['dominant_sentiment'] = 'negative'
+            # Convert sets to lists and determine dominant sentiment
+            for theme, data in theme_analysis.items():
+                data['key_words'] = list(data['key_words'])
+                if data['positive_count'] > data['negative_count']:
+                    data['dominant_sentiment'] = 'positive'
+                elif data['negative_count'] > data['positive_count']:
+                    data['dominant_sentiment'] = 'negative'
 
-    # Calculate sentiment distribution
-    total_words = len(word_analysis)
-    positive_count = len(positive_words)
-    negative_count = len(negative_words)
+            # Calculate sentiment distribution
+    total_words = sum(w['count'] for w in word_analysis)
+    positive_count = sum(w['count'] for w in positive_words)
+    negative_count = sum(w['count'] for w in negative_words)
     neutral_count = total_words - positive_count - negative_count
 
     # Compile results
@@ -961,9 +951,9 @@ def run_simple_sentiment_analysis(raw_text, material_type):
             'confidence': max(overall_sentiment['pos'], overall_sentiment['neg'], overall_sentiment['neu'])
         },
         'sentiment_distribution': {
-            'positive': len(positive_words),
-            'negative': len(negative_words),
-            'neutral': len(word_scores) - len(positive_words) - len(negative_words)
+            'positive': sum(w['count'] for w in positive_words),
+            'negative': sum(w['count'] for w in negative_words),
+            'neutral': sum(w['count'] for w in word_scores) - sum(w['count'] for w in positive_words) - sum(w['count'] for w in negative_words)
         },
         'top_words': {
             'positive': positive_words,
@@ -1180,7 +1170,7 @@ def create_streamlit_visualizations(results_data, config):
     
     with col2:
         # Marketing insights based on distribution
-        st.markdown("**📊 Marketing Insights:**")
+        st.markdown("**📊 Sentiment Insights:**")
         
         total = sum(sizes)
         pos_pct = (sizes[0] / total * 100) if total > 0 else 0
@@ -1190,9 +1180,9 @@ def create_streamlit_visualizations(results_data, config):
         # Sentiment balance insight
         if pos_pct > 60:
             st.success(f"✅ **Strong Positive Sentiment** ({pos_pct:.1f}%)")
-            st.write("• High customer satisfaction or brand affinity")
+            st.write("• High satisfaction or positive reception")
             st.write("• Good candidate for testimonials and case studies")
-            st.write("• Leverage positive language in marketing copy")
+            st.write("• Leverage positive language in communications")
         elif pos_pct > 40:
             st.info(f"📊 **Balanced Positive** ({pos_pct:.1f}%)")
             st.write("• Generally favorable reception")
@@ -1200,12 +1190,12 @@ def create_streamlit_visualizations(results_data, config):
             st.write("• Address neutral feedback to convert to positive")
         elif neg_pct > 40:
             st.error(f"⚠️ **High Negative Sentiment** ({neg_pct:.1f}%)")
-            st.write("• Critical pain points need immediate attention")
+            st.write("• Critical concerns need immediate attention")
             st.write("• Potential crisis management situation")
             st.write("• Prioritize addressing top negative themes")
         else:
             st.warning(f"⚪ **Neutral/Mixed Sentiment** (Neu: {neu_pct:.1f}%)")
-            st.write("• Opportunity to strengthen brand messaging")
+            st.write("• Opportunity to strengthen messaging")
             st.write("• Focus on emotional engagement strategies")
             st.write("• Conduct deeper qualitative research")
     
