@@ -235,13 +235,26 @@ def enhanced_preprocess_text(text, config):
     # Normalize whitespace
     cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
 
-    # Calculate readability metrics
+    # Calculate readability metrics (English text only)
+    # Note: Flesch-Kincaid formulas are designed for English text
+    # and use English syllable counting and sentence structure
     try:
-        readability_score = flesch_reading_ease(text)
-        grade_level = flesch_kincaid_grade(text)
-    except:
+        # Simple language detection heuristic
+        # Check if text is primarily ASCII/English characters
+        ascii_ratio = sum(c.isascii() for c in text[:1000]) / len(text[:1000]) if len(text) > 0 else 0
+        
+        if ascii_ratio > 0.8:  # Likely English or similar Latin-based language
+            readability_score = flesch_reading_ease(text)
+            grade_level = flesch_kincaid_grade(text)
+            readability_note = "Based on Flesch-Kincaid (English)"
+        else:
+            readability_score = None
+            grade_level = None
+            readability_note = "Not calculated (non-English text detected)"
+    except Exception as e:
         readability_score = None
         grade_level = None
+        readability_note = f"Calculation failed: {str(e)}"
 
     return {
         'original': text,
@@ -250,6 +263,7 @@ def enhanced_preprocess_text(text, config):
         'preserved_elements': preserved_elements,
         'readability_score': readability_score,
         'grade_level': grade_level,
+        'readability_note': readability_note,
         'word_count': len(cleaned_text.split()),
         'sentence_count': len(sent_tokenize(text))
     }
@@ -892,9 +906,9 @@ def display_streamlit_results(results_data, config):
         )
     
     # Text metrics
+    st.subheader("📚 Text Characteristics")
+    
     if metrics['readability_score']:
-        st.subheader("📚 Text Characteristics")
-        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -906,16 +920,23 @@ def display_streamlit_results(results_data, config):
                         'Difficult'
             
             st.metric(
-                label="Reading Level",
+                label="Reading Level (English)",
                 value=ease_level,
-                delta=f"Score: {metrics['readability_score']:.1f}"
+                delta=f"Score: {metrics['readability_score']:.1f}",
+                help="Flesch Reading Ease: 0-30=Very Difficult, 30-50=Difficult, 50-60=Fairly Difficult, 60-70=Standard, 70-80=Fairly Easy, 80-90=Easy, 90-100=Very Easy"
             )
         
         with col2:
             st.metric(
-                label="Grade Level",
-                value=f"{metrics['grade_level']:.1f}"
+                label="U.S. Grade Level",
+                value=f"{metrics['grade_level']:.1f}",
+                help="Flesch-Kincaid Grade Level indicates the U.S. school grade needed to understand the text"
             )
+        
+        st.caption(f"ℹ️ {metrics['readability_note']}")
+    else:
+        st.info(f"ℹ️ Readability metrics: {metrics['readability_note']}")
+        st.write("Note: Readability scores are only calculated for English text using the Flesch-Kincaid formulas.")
     
     # Top sentiment words
     st.subheader("🔍 Key Sentiment Words")
@@ -1165,31 +1186,89 @@ def display_enhanced_results(results_data, config):
 def display_methodology_notes(config):
     """Display enhanced methodology and limitations"""
     st.markdown("---")
-    st.markdown("**Analysis Configuration:**")
-    st.write(f"• Material type: {config.material_type}")
-    st.write(f"• Sentiment thresholds: +{config.POSITIVE_THRESHOLD} / {config.NEGATIVE_THRESHOLD}")
-    st.write(f"• Context window: {config.CONTEXT_WINDOW} words")
-    st.write(f"• N-gram analysis: {config.NGRAM_SIZE}-grams")
+    
+    st.markdown("### 🔬 Models & Tools Used")
+    st.markdown("""
+    **Sentiment Analysis:**
+    - **VADER (Valence Aware Dictionary and sEntiment Reasoner)** - NLTK implementation
+      - Lexicon-based sentiment analysis tool
+      - Optimized for social media and informal text
+      - Includes handling for emojis, capitalization, and punctuation emphasis
+      - Version: NLTK 3.x VADER Lexicon
+    
+    **Readability Analysis:**
+    - **Flesch Reading Ease** - Textstat library
+      - Formula: 206.835 - 1.015(total words/total sentences) - 84.6(total syllables/total words)
+      - Score range: 0-100 (higher = easier to read)
+      - **Designed for English text only**
+    - **Flesch-Kincaid Grade Level** - Textstat library
+      - Indicates U.S. school grade level required to understand text
+      - Based on sentence length and syllable counts
+      - **Calibrated for native English speakers**
+    
+    **Text Processing:**
+    - **NLTK Tokenizers** - Word and sentence tokenization
+    - **Python regex (re)** - Pattern matching and text cleaning
+    - **Python Collections** - Data aggregation (defaultdict, Counter)
+    """)
+    
+    st.markdown("### ⚙️ Analysis Configuration")
+    st.write(f"• **Material type:** {config.material_type}")
+    st.write(f"• **Sentiment thresholds:** Positive ≥ +{config.POSITIVE_THRESHOLD}, Negative ≤ {config.NEGATIVE_THRESHOLD}")
+    st.write(f"• **Context window:** {config.CONTEXT_WINDOW} words")
+    st.write(f"• **N-gram analysis:** {config.NGRAM_SIZE}-grams")
 
-    st.markdown("**Enhanced Features:**")
-    st.write("✅ Auto-detection of material type")
-    st.write("✅ Negation handling in sentiment calculation")
-    st.write("✅ Enhanced context analysis")
-    st.write("✅ Thematic sentiment mapping")
-    st.write("✅ Sentiment trend analysis")
-    st.write("✅ Reading difficulty assessment")
+    st.markdown("### ✨ Enhanced Features")
+    st.write("✅ Auto-detection of material type (novel, news, reviews, social media, academic, articles)")
+    st.write("✅ Negation handling in sentiment calculation (e.g., 'not good' → negative)")
+    st.write("✅ Enhanced context analysis with surrounding words")
+    st.write("✅ Thematic sentiment mapping across predefined themes")
+    st.write("✅ Sentiment trend analysis across text segments")
+    st.write("✅ Reading difficulty assessment (English only)")
 
-    st.markdown("**Important Limitations:**")
-    st.write("• VADER works best with informal text; formal academic writing may need domain-specific models")
-    st.write("• Sarcasm, irony, and cultural nuances may not be fully captured")
-    st.write("• Context-dependent meanings (domain-specific jargon) may be misinterpreted")
-    st.write("• Results should be validated with manual analysis for critical applications")
+    st.markdown("### ⚠️ Important Limitations")
+    
+    st.markdown("**Language Support:**")
+    st.write("• **Sentiment analysis:** Primarily designed for **English text**")
+    st.write("  - VADER lexicon contains English words and slang")
+    st.write("  - May produce unreliable results for non-English languages")
+    st.write("  - Recommendation: Use language-specific sentiment models for other languages")
+    st.write("• **Readability metrics:** **English only** (Flesch-Kincaid formulas)")
+    st.write("  - Based on English syllable patterns and sentence structures")
+    st.write("  - Not applicable to other languages (will show 'Not calculated')")
+    
+    st.markdown("**Model Limitations:**")
+    st.write("• **VADER** works best with informal, modern text (social media, reviews, news)")
+    st.write("  - May underperform on: formal academic writing, historical texts, specialized jargon")
+    st.write("  - Does not fully capture: sarcasm, irony, complex metaphors, cultural context")
+    st.write("• **Lexicon-based approach** has no machine learning or context understanding")
+    st.write("  - Sentiment determined by word lookup, not semantic meaning")
+    st.write("  - Cannot understand domain-specific meanings (e.g., 'positive test result' in medicine)")
+    
+    st.markdown("**Performance Limitations:**")
+    st.write("• Large texts (>100,000 words) are analyzed using first 5,000-10,000 tokens only")
+    st.write("• Analysis results are representative samples, not exhaustive full-text analysis")
+    
+    st.markdown("**Benchmark & Calibration:**")
+    st.write("• **Reading Level:** Calibrated for **U.S. native English speakers**")
+    st.write("  - Grade Level 12 = high school senior level")
+    st.write("  - Not adjusted for ESL learners or other language backgrounds")
+    st.write("• **Sentiment Scores:** No universal benchmark; context-dependent")
+    st.write("  - A score of +0.5 may be 'neutral' in reviews but 'positive' in news")
 
-    st.markdown("**Recommendations:**")
-    st.write("• Use results as a starting point for deeper qualitative analysis")
-    st.write("• Adjust thresholds and themes based on your specific domain")
-    st.write("• Cross-validate findings with subject matter experts")
-    st.write("• Consider cultural and temporal context of the text")
+    st.markdown("### 💡 Best Practices & Recommendations")
+    st.write("✓ **Use results as exploratory analysis**, not definitive conclusions")
+    st.write("✓ **Validate findings** with manual reading and subject matter experts")
+    st.write("✓ **Adjust thresholds** based on your specific domain and use case")
+    st.write("✓ **Consider context**: cultural background, time period, intended audience")
+    st.write("✓ **For critical applications**: Use multiple sentiment analysis tools and human validation")
+    st.write("✓ **Non-English text**: Seek language-specific NLP models (e.g., SpaCy, Transformers)")
+    
+    st.markdown("### 📚 References")
+    st.write("• Hutto, C.J. & Gilbert, E.E. (2014). VADER: A Parsimonious Rule-based Model for Sentiment Analysis of Social Media Text.")
+    st.write("• Flesch, R. (1948). A new readability yardstick. Journal of Applied Psychology.")
+    st.write("• NLTK Project: https://www.nltk.org/")
+    st.write("• Textstat Library: https://pypi.org/project/textstat/")
 
 # Initialize and run
 if __name__ == "__main__":
