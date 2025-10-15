@@ -259,12 +259,22 @@ def enhanced_preprocess_text(text, config):
 # ----------------------
 def get_enhanced_word_sentiments(text_data, config):
     """Enhanced word-level sentiment analysis with better context handling"""
-    # Limit tokens for performance
-    max_tokens = 10000
-    tokens = word_tokenize(text_data['original'])
+    # Limit tokens for performance - stricter for very large files
+    original_text = text_data['original']
+    word_count = len(original_text.split())
+    
+    if word_count > 100000:
+        max_tokens = 5000  # Very strict for huge files
+        st.warning(f"⚠️ Extremely large text detected ({word_count:,} words). Analyzing first {max_tokens:,} tokens for performance.")
+    elif word_count > 50000:
+        max_tokens = 7500
+        st.warning(f"⚠️ Very large text ({word_count:,} words). Analyzing first {max_tokens:,} tokens for performance.")
+    else:
+        max_tokens = 10000
+    
+    tokens = word_tokenize(original_text)
     
     if len(tokens) > max_tokens:
-        st.warning(f"⚠️ Text is very long ({len(tokens):,} tokens). Analyzing first {max_tokens:,} tokens for performance.")
         tokens = tokens[:max_tokens]
     
     word_details = defaultdict(lambda: {
@@ -634,10 +644,14 @@ def main():
     
     # Material type selection
     material_type = st.sidebar.selectbox(
-        "Select Material Type (or Auto-detect)",
+        "Select Material Type",
         ["auto", "novel", "news", "reviews", "social_media", "academic", "articles"],
-        help="Choose the type of text for optimized analysis"
+        help="Choose the type of text for optimized analysis. 'auto' will detect automatically."
     )
+    
+    # Add note about large files
+    st.sidebar.markdown("---")
+    st.sidebar.info("💡 **Tip**: For large files (>50,000 words), analysis may take several minutes. Consider analyzing a shorter excerpt for faster results.")
     
     # File upload or text input
     st.header("📁 Input Text")
@@ -729,12 +743,18 @@ def main():
 
 def run_sentiment_analysis(raw_text, material_type):
     """Run the sentiment analysis and return results"""
-    
-    # Auto-detect material type or use specified type
+
+            # Auto-detect material type or use specified type
     config = AnalysisConfig(material_type)
     if material_type == 'auto':
-        detected_type = config.auto_detect_material_type(raw_text[:2000])  # Sample first 2000 chars
+        detected_type = config.auto_detect_material_type(raw_text[:5000])  # Sample first 5000 chars for better detection
+        st.info(f"🔍 Auto-detected material type: **{detected_type}**. If incorrect, stop the analysis and select the correct type from the sidebar, then click 'Analyze Sentiment' again.")
         config.update_for_detected_type(detected_type)
+    else:
+        # User manually selected type
+        config.material_type = material_type
+        if material_type in config.MATERIAL_PRESETS:
+            config._apply_preset(material_type)
 
     # Enhanced preprocessing
     processed_text = enhanced_preprocess_text(raw_text, config)
