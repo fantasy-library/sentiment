@@ -209,6 +209,19 @@ class AnalysisConfig:
 # ----------------------
 def enhanced_preprocess_text(text, config):
     """Enhanced preprocessing with material-specific adaptations"""
+    # Validate input
+    if not text or not isinstance(text, str):
+        return {
+            'original': '',
+            'cleaned': '',
+            'lower': '',
+            'preserved_elements': {},
+            'readability_score': None,
+            'grade_level': None,
+            'readability_note': 'No text provided',
+            'word_count': 0,
+            'sentence_count': 0
+        }
 
     # Preserve important patterns before cleaning
     preserved_elements = {}
@@ -275,9 +288,16 @@ def enhanced_preprocess_text(text, config):
 # ----------------------
 def get_enhanced_word_sentiments(text_data, config):
     """Enhanced word-level sentiment analysis with better context handling"""
+    # Validate input
+    if not text_data or 'original' not in text_data or not text_data['original']:
+        return []
+    
     # Limit tokens for performance - stricter for very large files
     original_text = text_data['original']
     word_count = len(original_text.split())
+    
+    if word_count == 0:
+        return []
     
     if word_count > 100000:
         max_tokens = 5000  # Very strict for huge files
@@ -378,6 +398,10 @@ def get_enhanced_word_sentiments(text_data, config):
 
 def analyze_sentiment_patterns(text_data, config):
     """Analyze sentiment patterns and trends within the text"""
+    # Validate input
+    if not text_data or 'original' not in text_data or not text_data['original']:
+        return {'rolling_sentiment': [], 'sentiment_changes': []}
+    
     sentences = sent_tokenize(text_data['original'])
     sia = SentimentIntensityAnalyzer()
 
@@ -425,6 +449,10 @@ def analyze_sentiment_patterns(text_data, config):
 
 def enhanced_segment_analysis(text_data, config):
     """Enhanced segment analysis with adaptive segmentation"""
+    # Validate input
+    if not text_data or 'lower' not in text_data or not text_data['lower']:
+        return []
+    
     text = text_data['lower']
 
     # Try multiple segmentation strategies
@@ -871,12 +899,18 @@ def run_sentiment_analysis(raw_text, material_type):
     # Enhanced preprocessing
     processed_text = enhanced_preprocess_text(raw_text, config)
 
-    # Run enhanced analyses
+    # Run enhanced analyses with error handling
     sia = SentimentIntensityAnalyzer()
     overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
-    word_analysis = get_enhanced_word_sentiments(processed_text, config)
-    sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
-    segment_analysis = enhanced_segment_analysis(processed_text, config)
+    
+    try:
+        word_analysis = get_enhanced_word_sentiments(processed_text, config)
+        sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
+        segment_analysis = enhanced_segment_analysis(processed_text, config)
+    except Exception as e:
+        st.warning(f"⚠️ Enhanced analysis failed, using simplified mode: {str(e)}")
+        # Fallback to simple analysis
+        return run_simple_sentiment_analysis(raw_text, material_type)
 
     # Separate positive and negative words
     positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
