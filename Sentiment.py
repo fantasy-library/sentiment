@@ -912,11 +912,51 @@ def run_sentiment_analysis(raw_text, material_type):
         # Fallback to simple analysis
         return run_simple_sentiment_analysis(raw_text, material_type)
 
-    # Separate positive and negative words
-    positive_words = sorted([w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD],
-                           key=lambda x: (x['score'], x['count']), reverse=True)
-    negative_words = sorted([w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD],
-                           key=lambda x: (x['score'], x['count']))
+    # Separate words by sentiment type
+    all_positive_words = [w for w in word_analysis if w['score'] > config.POSITIVE_THRESHOLD]
+    all_negative_words = [w for w in word_analysis if w['score'] < config.NEGATIVE_THRESHOLD]
+    all_neutral_words = [w for w in word_analysis if config.NEGATIVE_THRESHOLD <= w['score'] <= config.POSITIVE_THRESHOLD]
+    
+    # Separate emotional words from other positive words
+    emotional_positive = []
+    quality_positive = []
+    other_positive = []
+    
+    for word_data in all_positive_words:
+        word = word_data['word']
+        if word in config.THEME_CODEBOOK.get('emotion_positive', []):
+            emotional_positive.append(word_data)
+        elif word in config.THEME_CODEBOOK.get('quality_positive', []):
+            quality_positive.append(word_data)
+        else:
+            other_positive.append(word_data)
+    
+    # Separate emotional words from other negative words
+    emotional_negative = []
+    quality_negative = []
+    other_negative = []
+    
+    for word_data in all_negative_words:
+        word = word_data['word']
+        if word in config.THEME_CODEBOOK.get('emotion_negative', []):
+            emotional_negative.append(word_data)
+        elif word in config.THEME_CODEBOOK.get('quality_negative', []):
+            quality_negative.append(word_data)
+        else:
+            other_negative.append(word_data)
+    
+    # Sort each category
+    emotional_positive = sorted(emotional_positive, key=lambda x: (x['score'], x['count']), reverse=True)
+    quality_positive = sorted(quality_positive, key=lambda x: (x['score'], x['count']), reverse=True)
+    other_positive = sorted(other_positive, key=lambda x: (x['score'], x['count']), reverse=True)
+    emotional_negative = sorted(emotional_negative, key=lambda x: (x['score'], x['count']))
+    quality_negative = sorted(quality_negative, key=lambda x: (x['score'], x['count']))
+    other_negative = sorted(other_negative, key=lambda x: (x['score'], x['count']))
+    neutral_words = sorted(all_neutral_words, key=lambda x: (abs(x['score']), x['count']), reverse=True)
+    
+    # For backward compatibility, keep the original positive_words as non-emotional words
+    positive_words = other_positive
+    negative_words = other_negative
 
     # Theme analysis
     theme_analysis = defaultdict(lambda: {
@@ -965,7 +1005,12 @@ def run_sentiment_analysis(raw_text, material_type):
         },
         'top_words': {
             'positive': positive_words[:20],
-            'negative': negative_words[:20]
+            'negative': negative_words[:20],
+            'neutral': neutral_words[:20],
+            'emotional_positive': emotional_positive[:20],
+            'quality_positive': quality_positive[:20],
+            'emotional_negative': emotional_negative[:20],
+            'quality_negative': quality_negative[:20]
         },
         'word_analysis': word_analysis,
         'sentiment_patterns': sentiment_patterns,
@@ -1026,7 +1071,12 @@ def run_simple_sentiment_analysis(raw_text, material_type):
         },
         'top_words': {
             'positive': positive_words,
-            'negative': negative_words
+            'negative': negative_words,
+            'neutral': [],
+            'emotional_positive': [],
+            'quality_positive': [],
+            'emotional_negative': [],
+            'quality_negative': []
         },
         'word_analysis': word_scores,
         'sentiment_patterns': {'rolling_sentiment': [], 'sentiment_changes': []},
@@ -1148,7 +1198,7 @@ def display_streamlit_results(results_data, config, raw_text):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**✅ Top Positive Words**")
+        st.write("**✅ Top Positive Words (Non-Emotional)**")
         if results_data['top_words']['positive']:
             pos_df = pd.DataFrame(results_data['top_words']['positive'][:10])
             st.dataframe(
@@ -1156,10 +1206,28 @@ def display_streamlit_results(results_data, config, raw_text):
                 use_container_width=True
             )
         else:
-            st.write("No significant positive words found.")
+            st.write("No non-emotional positive words found.")
+        
+        # Show emotional positive words separately
+        if results_data['top_words'].get('emotional_positive'):
+            st.write("**😊 Emotional Positive Words**")
+            emo_df = pd.DataFrame(results_data['top_words']['emotional_positive'][:10])
+            st.dataframe(
+                emo_df[['word', 'score', 'count', 'frequency']].round(3),
+                use_container_width=True
+            )
+        
+        # Show quality positive words separately
+        if results_data['top_words'].get('quality_positive'):
+            st.write("**⭐ Quality Positive Words**")
+            qual_df = pd.DataFrame(results_data['top_words']['quality_positive'][:10])
+            st.dataframe(
+                qual_df[['word', 'score', 'count', 'frequency']].round(3),
+                use_container_width=True
+            )
     
     with col2:
-        st.write("**❌ Top Negative Words**")
+        st.write("**❌ Top Negative Words (Non-Emotional)**")
         if results_data['top_words']['negative']:
             neg_df = pd.DataFrame(results_data['top_words']['negative'][:10])
             st.dataframe(
@@ -1167,7 +1235,36 @@ def display_streamlit_results(results_data, config, raw_text):
                 use_container_width=True
             )
         else:
-            st.write("No significant negative words found.")
+            st.write("No non-emotional negative words found.")
+        
+        # Show emotional negative words separately
+        if results_data['top_words'].get('emotional_negative'):
+            st.write("**😢 Emotional Negative Words**")
+            emo_neg_df = pd.DataFrame(results_data['top_words']['emotional_negative'][:10])
+            st.dataframe(
+                emo_neg_df[['word', 'score', 'count', 'frequency']].round(3),
+                use_container_width=True
+            )
+        
+        # Show quality negative words separately
+        if results_data['top_words'].get('quality_negative'):
+            st.write("**⭐ Quality Negative Words**")
+            qual_neg_df = pd.DataFrame(results_data['top_words']['quality_negative'][:10])
+            st.dataframe(
+                qual_neg_df[['word', 'score', 'count', 'frequency']].round(3),
+                use_container_width=True
+            )
+    
+    # Add neutral words section
+    if results_data['top_words'].get('neutral'):
+        st.subheader("⚪ Neutral Words")
+        st.write("**Words with neutral sentiment (neither strongly positive nor negative)**")
+        neutral_df = pd.DataFrame(results_data['top_words']['neutral'][:15])
+        st.dataframe(
+            neutral_df[['word', 'score', 'count', 'frequency']].round(3),
+            use_container_width=True
+        )
+        st.info("💡 **Hint**: Neutral words often represent factual, descriptive, or objective language. They can be important for understanding the overall tone and context of the text.")
     
     # Theme analysis
     st.subheader("🎭 Thematic Analysis")
