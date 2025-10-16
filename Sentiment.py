@@ -117,7 +117,7 @@ class AnalysisConfig:
 
         # Enhanced theme codebook with more comprehensive coverage
         self.THEME_CODEBOOK = {
-            'emotion_positive': ['love', 'joy', 'happiness', 'delight', 'excitement', 'pleasure', 'satisfaction', 'contentment', 'bliss', 'euphoria', 'gratitude', 'hope', 'optimism', 'enthusiasm', 'admiration'],
+            'emotion_positive': ['love', 'joy', 'happiness', 'delight', 'excitement', 'pleasure', 'satisfaction', 'contentment', 'bliss', 'gratitude', 'hope', 'optimism', 'enthusiasm', 'admiration'],
             'emotion_negative': ['hate', 'fear', 'sadness', 'anger', 'frustration', 'disappointment', 'grief', 'despair', 'anxiety', 'worry', 'disgust', 'contempt', 'resentment', 'bitterness', 'melancholy'],
             'quality_positive': ['excellent', 'brilliant', 'outstanding', 'superb', 'magnificent', 'wonderful', 'fantastic', 'amazing', 'incredible', 'remarkable', 'impressive', 'perfect', 'superior', 'exceptional'],
             'quality_negative': ['terrible', 'awful', 'horrible', 'dreadful', 'atrocious', 'appalling', 'deplorable', 'pathetic', 'inferior', 'mediocre', 'poor', 'bad', 'disappointing', 'unsatisfactory'],
