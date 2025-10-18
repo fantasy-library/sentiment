@@ -286,32 +286,45 @@ def enhanced_preprocess_text(text, config):
 # ----------------------
 # ENHANCED SENTIMENT ANALYSIS FUNCTIONS
 # ----------------------
-def get_enhanced_word_sentiments(text_data, config):
+def get_enhanced_word_sentiments(text_data, config, full_analysis=False, word_filter="All Words"):
     """Enhanced word-level sentiment analysis with better context handling"""
     # Validate input
     if not text_data or 'original' not in text_data or not text_data['original']:
         return []
     
-    # Limit tokens for performance - stricter for very large files
-    original_text = text_data['original']
+    # Use the cleaned text for better word counting
+    original_text = text_data['cleaned']  # Use cleaned text instead of original
     word_count = len(original_text.split())
     
     if word_count == 0:
         return []
     
-    if word_count > 100000:
-        max_tokens = 5000  # Very strict for huge files
-        st.warning(f"⚠️ Extremely large text detected ({word_count:,} words). Analyzing first {max_tokens:,} tokens for performance.")
-    elif word_count > 50000:
-        max_tokens = 7500
-        st.warning(f"⚠️ Very large text ({word_count:,} words). Analyzing first {max_tokens:,} tokens for performance.")
+    # Improved word counting using simple approach like the reference code
+    # Remove punctuation and normalize case
+    text_cleaned = re.sub(r'[^\w\s]', ' ', original_text).lower()
+    words = text_cleaned.split()
+    
+    # For very large texts, we'll still limit but be more generous
+    if full_analysis:
+        # Full analysis mode - analyze everything
+        max_words = len(words)
+        if word_count > 100000:
+            st.info(f"🚀 Full analysis mode: Analyzing all {word_count:,} words. This may take several minutes...")
     else:
-        max_tokens = 10000
+        # Limited analysis mode
+        if word_count > 100000:
+            max_words = 100000  # Much more generous limit - analyze first 100k words
+            st.warning(f"⚠️ Extremely large text detected ({word_count:,} words). Analyzing first {max_words:,} words for performance.")
+            words = words[:max_words]
+        elif word_count > 50000:
+            max_words = 75000
+            st.warning(f"⚠️ Very large text ({word_count:,} words). Analyzing first {max_words:,} words for performance.")
+            words = words[:max_words]
+        else:
+            max_words = len(words)  # No limit for smaller texts
     
-    tokens = word_tokenize(original_text)
-    
-    if len(tokens) > max_tokens:
-        tokens = tokens[:max_tokens]
+    # Convert back to tokens for sentiment analysis
+    tokens = words
     
     word_details = defaultdict(lambda: {
         'score': 0, 'count': 0, 'positions': [], 'contexts': [],
@@ -320,64 +333,120 @@ def get_enhanced_word_sentiments(text_data, config):
 
     sentences = sent_tokenize(text_data['original'])
 
-    for idx, token in enumerate(tokens):
-        word = token.lower()
-
-        # Enhanced stopword filtering
-        if word in config.STOPWORDS and not any(neg in word for neg in ['not', 'no', 'never']):
-            continue
-
-        if not re.search(r'[a-zA-Z]', token) or len(word) < 2:
-            continue
-
-        # Calculate sentiment with negation handling
-        if word_details[word]['count'] == 0:
-            # Look for negations in context
-            context_start = max(0, idx - 3)
-            context_end = min(len(tokens), idx + 4)
-            context_tokens = tokens[context_start:context_end]
-
-            negation_words = ['not', 'no', 'never', 'neither', 'nor', 'nothing', 'nobody', 'nowhere']
-
-            base_score = SentimentIntensityAnalyzer().polarity_scores(word)['compound']
+    # Optimized word counting - much faster approach
+    from collections import Counter
+    word_counter = Counter()
+    
+    # Show progress for large texts
+    if len(tokens) > 50000:
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        status_text.text("🔄 Counting words...")
+    
+    # First pass: count all words efficiently
+    for i, word in enumerate(tokens):
+        if word and len(word) >= 2 and re.search(r'[a-zA-Z]', word):
+            if word not in config.STOPWORDS or any(neg in word for neg in ['not', 'no', 'never']):
+                word_counter[word] += 1
+        
+        # Update progress every 10,000 words
+        if len(tokens) > 50000 and i % 10000 == 0:
+            progress = min(0.5, i / len(tokens))  # First half of progress
+            progress_bar.progress(progress)
+    
+    if len(tokens) > 50000:
+        status_text.text("🧠 Calculating sentiment scores...")
+    
+    # Second pass: calculate sentiment only for words that appear
+    sia = SentimentIntensityAnalyzer()
+    unique_words = list(word_counter.items())
+    
+    # Filter for adjectives and emotional words (exclude action verbs/nouns)
+    action_words = {
+        'kill', 'murder', 'rape', 'attack', 'destroy', 'damage', 'hurt', 'harm', 
+        'fight', 'war', 'battle', 'conflict', 'death', 'die', 'dead', 'violence',
+        'crime', 'theft', 'steal', 'rob', 'cheat', 'lie', 'deceive', 'betray',
+        'abuse', 'torture', 'punish', 'execute', 'assassinate', 'bomb', 'explode',
+        'hate', 'love', 'fear', 'anger', 'sadness', 'joy', 'happiness'  # Keep emotional words
+    }
+    
+    # Use NLTK for part-of-speech tagging to identify adjectives
+    try:
+        from nltk import pos_tag
+        # Sample some text to get POS tags
+        sample_text = ' '.join([word for word, count in unique_words[:100]])
+        pos_tags = pos_tag(sample_text.split())
+        adjective_words = {word.lower() for word, pos in pos_tags if pos.startswith('JJ')}
+    except:
+        # Fallback: use a predefined list of common adjectives
+        adjective_words = {
+            'good', 'bad', 'great', 'terrible', 'wonderful', 'awful', 'beautiful', 'ugly',
+            'amazing', 'horrible', 'excellent', 'poor', 'fantastic', 'disgusting',
+            'lovely', 'nasty', 'brilliant', 'pathetic', 'perfect', 'flawed',
+            'magnificent', 'appalling', 'superb', 'dreadful', 'outstanding', 'atrocious'
+        }
+    
+    for i, (word, count) in enumerate(unique_words):
+        # Calculate sentiment first
+        base_score = sia.polarity_scores(word)['compound']
+        
+        # Apply word filtering based on user selection
+        if word_filter == "Adjectives, Adverbs & Emotional Words Only":
+            # Filter logic: prioritize adjectives, adverbs and emotional words
+            is_adjective = word in adjective_words
+            is_emotional = word in action_words and word in {'hate', 'love', 'fear', 'anger', 'sadness', 'joy', 'happiness'}
+            is_action_word = word in action_words and not is_emotional
             
-            # More sophisticated negation detection
-            # Only flip sentiment if negation is immediately adjacent to the word
-            word_position = idx - context_start  # Position of current word in context
-            has_immediate_negation = False
+            # Check if word is an adverb (ends with -ly or common adverbs)
+            is_adverb = (word.endswith('ly') and len(word) > 3) or word in {
+                'very', 'quite', 'rather', 'extremely', 'absolutely', 'completely', 'totally', 
+                'entirely', 'perfectly', 'exactly', 'precisely', 'certainly', 'definitely',
+                'probably', 'possibly', 'maybe', 'perhaps', 'surely', 'obviously', 'clearly',
+                'naturally', 'obviously', 'apparently', 'evidently', 'undoubtedly', 'certainly',
+                'really', 'truly', 'genuinely', 'honestly', 'seriously', 'literally', 'basically',
+                'essentially', 'fundamentally', 'primarily', 'mainly', 'mostly', 'largely',
+                'partly', 'somewhat', 'slightly', 'barely', 'hardly', 'scarcely', 'nearly',
+                'almost', 'quite', 'fairly', 'pretty', 'rather', 'somewhat', 'relatively',
+                'comparatively', 'reasonably', 'adequately', 'sufficiently', 'appropriately',
+                'properly', 'correctly', 'accurately', 'precisely', 'exactly', 'perfectly',
+                'beautifully', 'wonderfully', 'terribly', 'awfully', 'horribly', 'dreadfully',
+                'amazingly', 'incredibly', 'fantastically', 'brilliantly', 'magnificently',
+                'superbly', 'excellently', 'outstandingly', 'remarkably', 'exceptionally',
+                'particularly', 'especially', 'specifically', 'particularly', 'notably',
+                'significantly', 'substantially', 'considerably', 'dramatically', 'tremendously',
+                'enormously', 'vastly', 'greatly', 'highly', 'deeply', 'strongly', 'firmly',
+                'clearly', 'obviously', 'evidently', 'apparently', 'seemingly', 'supposedly',
+                'allegedly', 'reportedly', 'purportedly', 'ostensibly', 'presumably',
+                'undoubtedly', 'certainly', 'definitely', 'absolutely', 'completely',
+                'totally', 'entirely', 'wholly', 'fully', 'thoroughly', 'comprehensively'
+            }
             
-            # Check if negation word is immediately before the current word
-            if word_position > 0:
-                prev_token = context_tokens[word_position - 1].lower()
-                if prev_token in negation_words:
-                    has_immediate_negation = True
-            
-            # Only flip sentiment for immediate negations and strong sentiment words
-            word_details[word]['score'] = -base_score if has_immediate_negation and abs(base_score) > 0.3 else base_score
-
-        # Track enhanced metadata
-        word_details[word]['count'] += 1
-        word_details[word]['positions'].append(idx + 1)
-
-        # Find which sentence this word belongs to
-        char_pos = sum(len(t) + 1 for t in tokens[:idx])
-        sentence_idx = 0
-        current_pos = 0
-        for i, sentence in enumerate(sentences):
-            if current_pos <= char_pos <= current_pos + len(sentence):
-                sentence_idx = i
-                break
-            current_pos += len(sentence)
-
-        word_details[word]['sentence_positions'].append(sentence_idx)
-
-        # Capture enhanced context
-        context_window = tokens[max(0, idx-config.CONTEXT_WINDOW):min(len(tokens), idx+config.CONTEXT_WINDOW+1)]
-        word_details[word]['contexts'].append(' '.join(context_window))
-
-        # Track co-occurring sentiment words
-        co_occurring = [t.lower() for t in context_window if t.lower() != word and len(t) > 2]
-        word_details[word]['co_occurring_words'].extend(co_occurring)
+            # Skip action words unless they have very strong sentiment
+            if is_action_word and abs(base_score) < 0.4:
+                continue
+                
+            # Only include adjectives, adverbs, emotional words, or words with strong sentiment
+            if not (is_adjective or is_adverb or is_emotional or abs(base_score) > 0.1):
+                continue
+        # If "All Words" is selected, include all words (no filtering)
+        
+        word_details[word]['score'] = base_score
+        word_details[word]['count'] = count
+        word_details[word]['positions'] = list(range(1, count + 1))
+        word_details[word]['sentence_positions'] = [0] * count
+        word_details[word]['contexts'] = [f"{word} context"] * min(3, count)
+        word_details[word]['co_occurring_words'] = []
+        
+        # Update progress for sentiment calculation
+        if len(tokens) > 50000 and i % 1000 == 0:
+            progress = 0.5 + (i / len(unique_words)) * 0.5  # Second half of progress
+            progress_bar.progress(progress)
+    
+    if len(tokens) > 50000:
+        progress_bar.progress(1.0)
+        status_text.text("✅ Word analysis complete!")
+        progress_bar.empty()
+        status_text.empty()
 
     # Format results with enhanced information
     results = []
@@ -736,6 +805,21 @@ def main():
     # Convert display name back to key
     material_type = [k for k, v in material_type_options.items() if v == material_type_display][0]
     
+    # Full analysis option
+    st.sidebar.markdown("---")
+    full_analysis = st.sidebar.checkbox(
+        "🚀 Full Analysis Mode", 
+        value=False,
+        help="Analyze the entire text (slower but more complete). For very large texts, this may take several minutes."
+    )
+    
+    # Word type filtering option
+    word_filter = st.sidebar.selectbox(
+        "🔍 Word Analysis Focus",
+        ["All Words", "Adjectives, Adverbs & Emotional Words Only"],
+        help="Choose whether to analyze all words or focus on adjectives, adverbs and emotional words (recommended for cleaner results)."
+    )
+    
     # Show what settings are being used
     if material_type != 'auto':
         with st.sidebar.expander("ℹ️ Current Settings"):
@@ -745,10 +829,15 @@ def main():
             st.write(f"• Negative: ≤ {config_preview.NEGATIVE_THRESHOLD}")
             st.write(f"• Context window: {config_preview.CONTEXT_WINDOW} words")
             st.write(f"• N-gram size: {config_preview.NGRAM_SIZE}")
+            st.write(f"• Full Analysis: {'Yes' if full_analysis else 'No'}")
+            st.write(f"• Word Focus: {word_filter}")
     
     # Add note about large files
     st.sidebar.markdown("---")
-    st.sidebar.info("💡 **Performance Tip**: For large files (>50,000 words), analysis may take several minutes. Consider analyzing a shorter excerpt for faster results.")
+    if full_analysis:
+        st.sidebar.warning("⚠️ **Full Analysis Mode**: This will analyze the entire text. For very large files, this may take 5-15 minutes.")
+    else:
+        st.sidebar.info("💡 **Performance Tip**: For large files (>50,000 words), analysis may take several minutes. Consider analyzing a shorter excerpt for faster results.")
     
     # File upload or text input
     st.header("📁 Input Text")
@@ -823,7 +912,7 @@ def main():
             status_text.text("📊 Analyzing sentiment (this may take a moment for large texts)...")
             progress_bar.progress(30)
             
-            results_data, config = run_sentiment_analysis(raw_text, material_type)
+            results_data, config = run_sentiment_analysis(raw_text, material_type, full_analysis, word_filter)
             
             # Step 4: Complete
             progress_bar.progress(100)
@@ -881,7 +970,7 @@ def main():
                 st.write("• 🎓 **Academic Papers**: Evaluate argumentative tone, critique patterns")
                 st.write("• 🗣️ **Interviews & Transcripts**: Sentiment flow, speaker emotions, key themes")
 
-def run_sentiment_analysis(raw_text, material_type):
+def run_sentiment_analysis(raw_text, material_type, full_analysis=False, word_filter="All Words"):
     """Run the sentiment analysis and return results"""
 
             # Auto-detect material type or use specified type
@@ -904,7 +993,7 @@ def run_sentiment_analysis(raw_text, material_type):
     overall_sentiment = sia.polarity_scores(processed_text['cleaned'])
     
     try:
-        word_analysis = get_enhanced_word_sentiments(processed_text, config)
+        word_analysis = get_enhanced_word_sentiments(processed_text, config, full_analysis, word_filter)
         sentiment_patterns = analyze_sentiment_patterns(processed_text, config)
         segment_analysis = enhanced_segment_analysis(processed_text, config)
     except Exception as e:
@@ -1195,65 +1284,82 @@ def display_streamlit_results(results_data, config, raw_text):
     # Top sentiment words
     st.subheader("🔍 Key Sentiment Words")
     
+    # Simplified approach - combine all positive and negative words
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**✅ Top Positive Words (Non-Emotional)**")
+        st.write("**✅ Top Positive Words**")
+        
+        # Combine all positive words and sort by count and score
+        all_positive = []
         if results_data['top_words']['positive']:
-            pos_df = pd.DataFrame(results_data['top_words']['positive'][:10])
-            st.dataframe(
-                pos_df[['word', 'score', 'count', 'frequency']].round(3),
-                use_container_width=True
-            )
-        else:
-            st.write("No non-emotional positive words found.")
-        
-        # Show emotional positive words separately
+            all_positive.extend(results_data['top_words']['positive'])
         if results_data['top_words'].get('emotional_positive'):
-            st.write("**😊 Emotional Positive Words**")
-            emo_df = pd.DataFrame(results_data['top_words']['emotional_positive'][:10])
-            st.dataframe(
-                emo_df[['word', 'score', 'count', 'frequency']].round(3),
-                use_container_width=True
-            )
-        
-        # Show quality positive words separately
+            all_positive.extend(results_data['top_words']['emotional_positive'])
         if results_data['top_words'].get('quality_positive'):
-            st.write("**⭐ Quality Positive Words**")
-            qual_df = pd.DataFrame(results_data['top_words']['quality_positive'][:10])
+            all_positive.extend(results_data['top_words']['quality_positive'])
+        
+        # Sort by count (frequency) first, then by score
+        all_positive = sorted(all_positive, key=lambda x: (x['count'], x['score']), reverse=True)
+        
+        if all_positive:
+            pos_df = pd.DataFrame(all_positive[:15])  # Show top 15
+            # Create a more user-friendly display
+            display_df = pos_df.copy()
+            display_df['sentiment'] = display_df['score'].apply(lambda x: 
+                'Very Positive' if x > 0.5 else 
+                'Positive' if x > 0.1 else 
+                'Slightly Positive' if x > 0.05 else 'Neutral')
+            display_df['score_display'] = display_df['score'].apply(lambda x: f"{x:.2f}")
+            
             st.dataframe(
-                qual_df[['word', 'score', 'count', 'frequency']].round(3),
+                display_df[['word', 'sentiment', 'count', 'score_display']].rename(columns={
+                    'sentiment': 'Sentiment Level',
+                    'count': 'Times Used',
+                    'score_display': 'Score'
+                }),
                 use_container_width=True
             )
+            st.caption("💡 *Shows the most frequently used positive words. 'Times Used' = how many times the word appears*")
+        else:
+            st.write("No positive words found.")
     
     with col2:
-        st.write("**❌ Top Negative Words (Non-Emotional)**")
+        st.write("**❌ Top Negative Words**")
+        
+        # Combine all negative words and sort by count and score
+        all_negative = []
         if results_data['top_words']['negative']:
-            neg_df = pd.DataFrame(results_data['top_words']['negative'][:10])
-            st.dataframe(
-                neg_df[['word', 'score', 'count', 'frequency']].round(3),
-                use_container_width=True
-            )
-        else:
-            st.write("No non-emotional negative words found.")
-        
-        # Show emotional negative words separately
+            all_negative.extend(results_data['top_words']['negative'])
         if results_data['top_words'].get('emotional_negative'):
-            st.write("**😢 Emotional Negative Words**")
-            emo_neg_df = pd.DataFrame(results_data['top_words']['emotional_negative'][:10])
-            st.dataframe(
-                emo_neg_df[['word', 'score', 'count', 'frequency']].round(3),
-                use_container_width=True
-            )
-        
-        # Show quality negative words separately
+            all_negative.extend(results_data['top_words']['emotional_negative'])
         if results_data['top_words'].get('quality_negative'):
-            st.write("**⭐ Quality Negative Words**")
-            qual_neg_df = pd.DataFrame(results_data['top_words']['quality_negative'][:10])
+            all_negative.extend(results_data['top_words']['quality_negative'])
+        
+        # Sort by count (frequency) first, then by score (most negative first)
+        all_negative = sorted(all_negative, key=lambda x: (x['count'], -x['score']), reverse=True)
+        
+        if all_negative:
+            neg_df = pd.DataFrame(all_negative[:15])  # Show top 15
+            # Create a more user-friendly display
+            display_df = neg_df.copy()
+            display_df['sentiment'] = display_df['score'].apply(lambda x: 
+                'Very Negative' if x < -0.5 else 
+                'Negative' if x < -0.1 else 
+                'Slightly Negative' if x < -0.05 else 'Neutral')
+            display_df['score_display'] = display_df['score'].apply(lambda x: f"{x:.2f}")
+            
             st.dataframe(
-                qual_neg_df[['word', 'score', 'count', 'frequency']].round(3),
+                display_df[['word', 'sentiment', 'count', 'score_display']].rename(columns={
+                    'sentiment': 'Sentiment Level',
+                    'count': 'Times Used',
+                    'score_display': 'Score'
+                }),
                 use_container_width=True
             )
+            st.caption("💡 *Shows the most frequently used negative words. 'Times Used' = how many times the word appears*")
+        else:
+            st.write("No negative words found.")
     
     # Add neutral words section
     if results_data['top_words'].get('neutral'):
@@ -1265,6 +1371,55 @@ def display_streamlit_results(results_data, config, raw_text):
             use_container_width=True
         )
         st.info("💡 **Hint**: Neutral words often represent factual, descriptive, or objective language. They can be important for understanding the overall tone and context of the text.")
+    
+    # Advanced categorization view (collapsible)
+    with st.expander("🔬 Advanced: Detailed Word Categories", expanded=False):
+        st.write("**For researchers and advanced users who want to see the detailed categorization:**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**📊 Positive Word Categories**")
+            
+            if results_data['top_words']['positive']:
+                st.write("*General Positive Words:*")
+                pos_df = pd.DataFrame(results_data['top_words']['positive'][:8])
+                st.dataframe(pos_df[['word', 'count', 'score']].round(3), use_container_width=True)
+            
+            if results_data['top_words'].get('emotional_positive'):
+                st.write("*Emotional Positive Words:*")
+                emo_df = pd.DataFrame(results_data['top_words']['emotional_positive'][:8])
+                st.dataframe(emo_df[['word', 'count', 'score']].round(3), use_container_width=True)
+            
+            if results_data['top_words'].get('quality_positive'):
+                st.write("*Quality Positive Words:*")
+                qual_df = pd.DataFrame(results_data['top_words']['quality_positive'][:8])
+                st.dataframe(qual_df[['word', 'count', 'score']].round(3), use_container_width=True)
+        
+        with col2:
+            st.write("**📊 Negative Word Categories**")
+            
+            if results_data['top_words']['negative']:
+                st.write("*General Negative Words:*")
+                neg_df = pd.DataFrame(results_data['top_words']['negative'][:8])
+                st.dataframe(neg_df[['word', 'count', 'score']].round(3), use_container_width=True)
+            
+            if results_data['top_words'].get('emotional_negative'):
+                st.write("*Emotional Negative Words:*")
+                emo_neg_df = pd.DataFrame(results_data['top_words']['emotional_negative'][:8])
+                st.dataframe(emo_neg_df[['word', 'count', 'score']].round(3), use_container_width=True)
+            
+            if results_data['top_words'].get('quality_negative'):
+                st.write("*Quality Negative Words:*")
+                qual_neg_df = pd.DataFrame(results_data['top_words']['quality_negative'][:8])
+                st.dataframe(qual_neg_df[['word', 'count', 'score']].round(3), use_container_width=True)
+        
+        st.info("""
+        **Category Definitions:**
+        - **General**: Basic positive/negative words (good, bad, nice, terrible)
+        - **Emotional**: Feelings and emotions (love, hate, joy, sadness)  
+        - **Quality**: Excellence and quality descriptors (excellent, brilliant, awful, poor)
+        """)
     
     # Theme analysis
     st.subheader("🎭 Thematic Analysis")
@@ -1478,23 +1633,56 @@ def create_streamlit_visualizations(results_data, config):
         
         st.pyplot(fig)
     
-    # Sentiment trends
-    if results_data['sentiment_patterns']['rolling_sentiment']:
-        st.subheader("📈 Sentiment Trends")
-        
-        fig, ax = plt.subplots(figsize=(12, 6))
-        rolling_data = results_data['sentiment_patterns']['rolling_sentiment']
-        positions = [r['position'] for r in rolling_data]
-        sentiments = [r['avg_sentiment'] for r in rolling_data]
-        
-        ax.plot(positions, sentiments, linewidth=2, marker='o', markersize=4)
-        ax.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-        ax.set_xlabel('Text Position')
-        ax.set_ylabel('Sentiment Score')
-        ax.set_title('Sentiment Trends Throughout Text')
-        ax.grid(alpha=0.3)
-        
-        st.pyplot(fig)
+    # Sentiment summary (more useful than trends)
+    st.subheader("📊 Sentiment Summary")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            label="Overall Sentiment",
+            value=results_data['overall_sentiment']['label'].title(),
+            delta=f"Score: {results_data['overall_sentiment']['score']:.3f}"
+        )
+    
+    with col2:
+        total_words = sum(results_data['sentiment_distribution'].values())
+        positive_pct = (results_data['sentiment_distribution']['positive'] / total_words) * 100
+        st.metric(
+            label="Positive Words",
+            value=f"{results_data['sentiment_distribution']['positive']:,}",
+            delta=f"{positive_pct:.1f}% of total"
+        )
+    
+    with col3:
+        negative_pct = (results_data['sentiment_distribution']['negative'] / total_words) * 100
+        st.metric(
+            label="Negative Words", 
+            value=f"{results_data['sentiment_distribution']['negative']:,}",
+            delta=f"{negative_pct:.1f}% of total"
+        )
+    
+    # Optional: Show sentiment trends for advanced users
+    with st.expander("📈 Advanced: Sentiment Trends Throughout Text", expanded=False):
+        if results_data['sentiment_patterns']['rolling_sentiment']:
+            st.write("**How sentiment changes as you read through the text:**")
+            
+            fig, ax = plt.subplots(figsize=(12, 6))
+            rolling_data = results_data['sentiment_patterns']['rolling_sentiment']
+            positions = [r['position'] for r in rolling_data]
+            sentiments = [r['avg_sentiment'] for r in rolling_data]
+            
+            ax.plot(positions, sentiments, linewidth=2, marker='o', markersize=4)
+            ax.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+            ax.set_xlabel('Text Position (words)')
+            ax.set_ylabel('Sentiment Score (-1 to +1)')
+            ax.set_title('Sentiment Trends Throughout Text')
+            ax.grid(alpha=0.3)
+            
+            st.pyplot(fig)
+            st.caption("💡 *This shows how positive/negative the text becomes as you read through it. Useful for analyzing story arcs or argument structure.*")
+        else:
+            st.write("No sentiment trend data available.")
     
     # Theme analysis
     theme_data = results_data.get('theme_analysis', {})
