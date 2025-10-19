@@ -115,20 +115,120 @@ class AnalysisConfig:
         self.CUSTOM_RETAIN_WORDS = {'not', 'no', 'none', 'never', 'nothing', 'neither', 'nor'}
         self.STOPWORDS = self.BASE_STOPWORDS.union(self.ADDITIONAL_STOPWORDS) - self.CUSTOM_RETAIN_WORDS
 
-        # Enhanced theme codebook with more comprehensive coverage
+        # Enhanced theme codebook with comprehensive vocabulary coverage
         self.THEME_CODEBOOK = {
-            'emotion_positive': ['love', 'joy', 'happiness', 'delight', 'excitement', 'pleasure', 'satisfaction', 'contentment', 'bliss', 'gratitude', 'hope', 'optimism', 'enthusiasm', 'admiration'],
-            'emotion_negative': ['hate', 'fear', 'sadness', 'anger', 'frustration', 'disappointment', 'grief', 'despair', 'anxiety', 'worry', 'disgust', 'contempt', 'resentment', 'bitterness', 'melancholy'],
-            'quality_positive': ['excellent', 'brilliant', 'outstanding', 'superb', 'magnificent', 'wonderful', 'fantastic', 'amazing', 'incredible', 'remarkable', 'impressive', 'perfect', 'superior', 'exceptional'],
-            'quality_negative': ['terrible', 'awful', 'horrible', 'dreadful', 'atrocious', 'appalling', 'deplorable', 'pathetic', 'inferior', 'mediocre', 'poor', 'bad', 'disappointing', 'unsatisfactory'],
-            'power_authority': ['control', 'authority', 'power', 'dominance', 'leadership', 'influence', 'command', 'rule', 'govern', 'dictate', 'hierarchy', 'superior', 'subordinate', 'obey'],
-            'conflict_tension': ['fight', 'struggle', 'conflict', 'battle', 'war', 'dispute', 'argument', 'confrontation', 'clash', 'tension', 'opposition', 'resistance', 'rebellion', 'protest'],
-            'relationships': ['family', 'friend', 'partner', 'colleague', 'companion', 'ally', 'enemy', 'rival', 'neighbor', 'community', 'society', 'relationship', 'bond', 'connection'],
-            'performance_arts': ['acting', 'performance', 'actor', 'character', 'role', 'scene', 'dialogue', 'script', 'plot', 'story', 'narrative', 'cinematography', 'direction', 'production'],
-            'technology': ['digital', 'online', 'internet', 'computer', 'software', 'app', 'website', 'platform', 'system', 'technology', 'innovation', 'artificial', 'data'],
-            'business_economy': ['profit', 'loss', 'revenue', 'cost', 'price', 'market', 'business', 'economy', 'financial', 'investment', 'budget', 'expense', 'income', 'growth'],
-            'health_wellness': ['health', 'medical', 'doctor', 'treatment', 'medicine', 'therapy', 'wellness', 'fitness', 'exercise', 'nutrition', 'diet', 'healing', 'recovery', 'illness'],
-            'time_temporal': ['past', 'present', 'future', 'history', 'memory', 'nostalgia', 'tradition', 'modern', 'contemporary', 'ancient', 'recent', 'current', 'upcoming', 'forever']
+            'emotion_positive': [
+                'love', 'joy', 'happiness', 'delight', 'excitement', 'pleasure', 'satisfaction', 'contentment', 'bliss', 'gratitude', 'hope', 'optimism', 'enthusiasm', 'admiration',
+                'cheerful', 'jubilant', 'ecstatic', 'elated', 'thrilled', 'euphoric', 'radiant', 'blissful', 'serene', 'peaceful', 'tranquil', 'calm', 'relaxed', 'comfortable',
+                'proud', 'accomplished', 'fulfilled', 'grateful', 'blessed', 'fortunate', 'lucky', 'cherished', 'treasured', 'valued', 'appreciated', 'loved', 'adored', 'worshipped',
+                'inspired', 'motivated', 'energized', 'vibrant', 'lively', 'dynamic', 'passionate', 'ardent', 'fervent', 'zealous', 'eager', 'keen', 'enthusiastic', 'excited',
+                'amused', 'entertained', 'charmed', 'captivated', 'enchanted', 'mesmerized', 'fascinated', 'intrigued', 'curious', 'wonder', 'awe', 'reverence', 'respect', 'esteem'
+            ],
+            'emotion_negative': [
+                'hate', 'fear', 'sadness', 'anger', 'frustration', 'disappointment', 'grief', 'despair', 'anxiety', 'worry', 'disgust', 'contempt', 'resentment', 'bitterness', 'melancholy',
+                'depressed', 'miserable', 'wretched', 'devastated', 'crushed', 'heartbroken', 'shattered', 'destroyed', 'ruined', 'defeated', 'hopeless', 'helpless', 'powerless', 'trapped',
+                'furious', 'livid', 'enraged', 'outraged', 'infuriated', 'incensed', 'irritated', 'annoyed', 'bothered', 'aggravated', 'exasperated', 'frustrated', 'agitated', 'disturbed',
+                'terrified', 'petrified', 'horrified', 'shocked', 'stunned', 'alarmed', 'panicked', 'nervous', 'uneasy', 'uncomfortable', 'restless', 'tense', 'stressed', 'overwhelmed',
+                'lonely', 'isolated', 'abandoned', 'rejected', 'unwanted', 'unloved', 'neglected', 'ignored', 'dismissed', 'humiliated', 'embarrassed', 'ashamed', 'guilty', 'remorseful'
+            ],
+            'quality_positive': [
+                'excellent', 'brilliant', 'outstanding', 'superb', 'magnificent', 'wonderful', 'fantastic', 'amazing', 'incredible', 'remarkable', 'impressive', 'perfect', 'superior', 'exceptional',
+                'marvelous', 'splendid', 'glorious', 'divine', 'heavenly', 'celestial', 'transcendent', 'extraordinary', 'phenomenal', 'spectacular', 'stunning', 'breathtaking', 'mesmerizing', 'captivating',
+                'flawless', 'impeccable', 'pristine', 'immaculate', 'spotless', 'pure', 'genuine', 'authentic', 'real', 'true', 'honest', 'sincere', 'genuine', 'legitimate', 'valid',
+                'premium', 'luxury', 'high-end', 'top-tier', 'first-class', 'world-class', 'elite', 'premium', 'superior', 'advanced', 'sophisticated', 'refined', 'elegant', 'graceful',
+                'reliable', 'dependable', 'trustworthy', 'consistent', 'stable', 'solid', 'strong', 'robust', 'durable', 'lasting', 'enduring', 'permanent', 'secure', 'safe'
+            ],
+            'quality_negative': [
+                'terrible', 'awful', 'horrible', 'dreadful', 'atrocious', 'appalling', 'deplorable', 'pathetic', 'inferior', 'mediocre', 'poor', 'bad', 'disappointing', 'unsatisfactory',
+                'disgusting', 'revolting', 'repulsive', 'repugnant', 'nauseating', 'sickening', 'offensive', 'distasteful', 'unpleasant', 'unappealing', 'unattractive', 'ugly', 'hideous', 'grotesque',
+                'useless', 'worthless', 'pointless', 'meaningless', 'empty', 'hollow', 'shallow', 'superficial', 'fake', 'artificial', 'phony', 'bogus', 'fraudulent', 'deceptive', 'misleading',
+                'broken', 'damaged', 'defective', 'faulty', 'flawed', 'imperfect', 'incomplete', 'insufficient', 'inadequate', 'lacking', 'missing', 'absent', 'void', 'empty', 'vacant',
+                'cheap', 'shoddy', 'crude', 'rough', 'coarse', 'harsh', 'brutal', 'savage', 'barbaric', 'primitive', 'backward', 'outdated', 'obsolete', 'archaic', 'antiquated'
+            ],
+            'power_authority': [
+                'control', 'authority', 'power', 'dominance', 'leadership', 'influence', 'command', 'rule', 'govern', 'dictate', 'hierarchy', 'superior', 'subordinate', 'obey',
+                'boss', 'manager', 'director', 'executive', 'president', 'chief', 'head', 'leader', 'commander', 'captain', 'general', 'admiral', 'colonel', 'sergeant', 'officer',
+                'king', 'queen', 'emperor', 'empress', 'prince', 'princess', 'duke', 'duchess', 'lord', 'lady', 'noble', 'aristocrat', 'royal', 'monarch', 'sovereign',
+                'master', 'owner', 'proprietor', 'possessor', 'holder', 'keeper', 'guardian', 'protector', 'defender', 'champion', 'advocate', 'supporter', 'patron', 'sponsor',
+                'dominant', 'controlling', 'manipulative', 'coercive', 'oppressive', 'tyrannical', 'dictatorial', 'authoritarian', 'totalitarian', 'autocratic', 'despotic', 'imperial'
+            ],
+            'conflict_tension': [
+                'fight', 'struggle', 'conflict', 'battle', 'war', 'dispute', 'argument', 'confrontation', 'clash', 'tension', 'opposition', 'resistance', 'rebellion', 'protest',
+                'combat', 'warfare', 'hostilities', 'aggression', 'violence', 'attack', 'assault', 'invasion', 'siege', 'campaign', 'offensive', 'defensive', 'retreat', 'surrender',
+                'debate', 'disagreement', 'controversy', 'contention', 'rivalry', 'competition', 'contest', 'challenge', 'opposition', 'resistance', 'defiance', 'rebellion', 'revolt', 'uprising',
+                'stress', 'pressure', 'strain', 'burden', 'load', 'weight', 'tension', 'friction', 'hostility', 'animosity', 'antagonism', 'enmity', 'hatred', 'malice', 'spite',
+                'crisis', 'emergency', 'urgency', 'danger', 'threat', 'risk', 'hazard', 'peril', 'jeopardy', 'menace', 'intimidation', 'bullying', 'harassment', 'persecution'
+            ],
+            'relationships': [
+                'family', 'friend', 'partner', 'colleague', 'companion', 'ally', 'enemy', 'rival', 'neighbor', 'community', 'society', 'relationship', 'bond', 'connection',
+                'parent', 'mother', 'father', 'sister', 'brother', 'daughter', 'son', 'grandmother', 'grandfather', 'aunt', 'uncle', 'cousin', 'nephew', 'niece', 'relative',
+                'spouse', 'husband', 'wife', 'boyfriend', 'girlfriend', 'fiancé', 'fiancée', 'lover', 'sweetheart', 'darling', 'beloved', 'soulmate', 'mate', 'companion',
+                'teammate', 'classmate', 'roommate', 'neighbor', 'acquaintance', 'stranger', 'guest', 'visitor', 'host', 'mentor', 'student', 'teacher', 'coach', 'advisor',
+                'intimacy', 'closeness', 'affection', 'fondness', 'attachment', 'devotion', 'loyalty', 'faithfulness', 'trust', 'respect', 'admiration', 'appreciation', 'gratitude'
+            ],
+            'performance_arts': [
+                'acting', 'performance', 'actor', 'character', 'role', 'scene', 'dialogue', 'script', 'plot', 'story', 'narrative', 'cinematography', 'direction', 'production',
+                'theater', 'stage', 'audience', 'audition', 'rehearsal', 'show', 'play', 'musical', 'drama', 'comedy', 'tragedy', 'opera', 'ballet', 'dance', 'concert',
+                'movie', 'film', 'cinema', 'documentary', 'animation', 'cartoon', 'series', 'episode', 'season', 'pilot', 'finale', 'premiere', 'release', 'screening',
+                'director', 'producer', 'writer', 'screenwriter', 'playwright', 'composer', 'musician', 'singer', 'dancer', 'choreographer', 'designer', 'costume', 'makeup',
+                'award', 'nomination', 'recognition', 'acclaim', 'praise', 'criticism', 'review', 'rating', 'box office', 'success', 'hit', 'flop', 'blockbuster'
+            ],
+            'technology': [
+                'digital', 'online', 'internet', 'computer', 'software', 'app', 'website', 'platform', 'system', 'technology', 'innovation', 'artificial', 'data',
+                'smartphone', 'tablet', 'laptop', 'desktop', 'server', 'cloud', 'database', 'algorithm', 'programming', 'coding', 'development', 'engineering', 'design',
+                'social media', 'facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'tiktok', 'snapchat', 'messaging', 'email', 'chat', 'video call', 'streaming',
+                'ai', 'machine learning', 'automation', 'robotics', 'virtual reality', 'augmented reality', 'blockchain', 'cryptocurrency', 'bitcoin', 'nft', 'metaverse',
+                'cybersecurity', 'privacy', 'encryption', 'hacking', 'malware', 'virus', 'bug', 'glitch', 'update', 'upgrade', 'maintenance', 'backup', 'recovery'
+            ],
+            'business_economy': [
+                'profit', 'loss', 'revenue', 'cost', 'price', 'market', 'business', 'economy', 'financial', 'investment', 'budget', 'expense', 'income', 'growth',
+                'company', 'corporation', 'enterprise', 'organization', 'firm', 'agency', 'institution', 'foundation', 'charity', 'nonprofit', 'startup', 'venture',
+                'ceo', 'cfo', 'manager', 'employee', 'worker', 'staff', 'team', 'department', 'division', 'branch', 'office', 'headquarters', 'factory', 'warehouse',
+                'sales', 'marketing', 'advertising', 'promotion', 'brand', 'product', 'service', 'customer', 'client', 'consumer', 'buyer', 'seller', 'vendor', 'supplier',
+                'stock', 'share', 'equity', 'bond', 'loan', 'credit', 'debt', 'mortgage', 'insurance', 'tax', 'accounting', 'audit', 'compliance', 'regulation'
+            ],
+            'health_wellness': [
+                'health', 'medical', 'doctor', 'treatment', 'medicine', 'therapy', 'wellness', 'fitness', 'exercise', 'nutrition', 'diet', 'healing', 'recovery', 'illness',
+                'hospital', 'clinic', 'pharmacy', 'laboratory', 'surgery', 'operation', 'procedure', 'diagnosis', 'symptom', 'disease', 'condition', 'disorder', 'syndrome',
+                'nurse', 'physician', 'specialist', 'surgeon', 'dentist', 'therapist', 'counselor', 'psychologist', 'psychiatrist', 'paramedic', 'technician', 'researcher',
+                'medication', 'drug', 'vaccine', 'antibiotic', 'painkiller', 'vitamin', 'supplement', 'herb', 'remedy', 'cure', 'prevention', 'screening', 'checkup',
+                'mental health', 'depression', 'anxiety', 'stress', 'trauma', 'addiction', 'rehabilitation', 'counseling', 'meditation', 'mindfulness', 'yoga', 'meditation'
+            ],
+            'time_temporal': [
+                'past', 'present', 'future', 'history', 'memory', 'nostalgia', 'tradition', 'modern', 'contemporary', 'ancient', 'recent', 'current', 'upcoming', 'forever',
+                'yesterday', 'today', 'tomorrow', 'morning', 'afternoon', 'evening', 'night', 'dawn', 'dusk', 'midnight', 'noon', 'hour', 'minute', 'second',
+                'week', 'month', 'year', 'decade', 'century', 'millennium', 'era', 'period', 'age', 'generation', 'lifetime', 'moment', 'instant', 'duration',
+                'beginning', 'start', 'commencement', 'end', 'finish', 'conclusion', 'termination', 'continuation', 'progress', 'advancement', 'development', 'evolution',
+                'temporary', 'permanent', 'eternal', 'infinite', 'timeless', 'seasonal', 'annual', 'monthly', 'weekly', 'daily', 'hourly', 'momentary', 'brief', 'lasting'
+            ],
+            'education_learning': [
+                'school', 'university', 'college', 'education', 'learning', 'teaching', 'study', 'research', 'knowledge', 'wisdom', 'intelligence', 'skill', 'talent', 'ability',
+                'student', 'teacher', 'professor', 'instructor', 'tutor', 'mentor', 'scholar', 'academic', 'researcher', 'scientist', 'expert', 'specialist', 'professional',
+                'classroom', 'lecture', 'seminar', 'workshop', 'course', 'curriculum', 'syllabus', 'textbook', 'library', 'laboratory', 'experiment', 'theory', 'practice',
+                'degree', 'diploma', 'certificate', 'qualification', 'examination', 'test', 'quiz', 'assignment', 'homework', 'project', 'thesis', 'dissertation', 'paper',
+                'literature', 'philosophy', 'mathematics', 'science', 'history', 'geography', 'art', 'music', 'language', 'grammar', 'vocabulary', 'spelling', 'writing'
+            ],
+            'nature_environment': [
+                'nature', 'environment', 'earth', 'world', 'planet', 'universe', 'space', 'sky', 'cloud', 'sun', 'moon', 'star', 'ocean', 'sea', 'river', 'lake', 'mountain',
+                'forest', 'tree', 'flower', 'grass', 'plant', 'animal', 'bird', 'fish', 'insect', 'butterfly', 'bee', 'dog', 'cat', 'horse', 'lion', 'tiger', 'elephant',
+                'weather', 'rain', 'snow', 'wind', 'storm', 'thunder', 'lightning', 'sunshine', 'rainbow', 'season', 'spring', 'summer', 'autumn', 'winter', 'climate',
+                'green', 'blue', 'red', 'yellow', 'white', 'black', 'color', 'beauty', 'scenic', 'landscape', 'wilderness', 'garden', 'park', 'beach', 'desert', 'jungle',
+                'conservation', 'protection', 'pollution', 'recycling', 'sustainability', 'renewable', 'energy', 'solar', 'wind', 'water', 'air', 'soil', 'ecosystem'
+            ],
+            'food_dining': [
+                'food', 'meal', 'dinner', 'lunch', 'breakfast', 'snack', 'drink', 'beverage', 'water', 'coffee', 'tea', 'juice', 'wine', 'beer', 'alcohol', 'cocktail',
+                'restaurant', 'cafe', 'bar', 'kitchen', 'cooking', 'recipe', 'ingredient', 'spice', 'herb', 'flavor', 'taste', 'delicious', 'tasty', 'sweet', 'sour', 'bitter',
+                'meat', 'chicken', 'beef', 'pork', 'fish', 'seafood', 'vegetable', 'fruit', 'salad', 'soup', 'pasta', 'pizza', 'bread', 'cake', 'dessert', 'chocolate',
+                'healthy', 'nutritious', 'organic', 'fresh', 'frozen', 'canned', 'raw', 'cooked', 'baked', 'fried', 'grilled', 'steamed', 'boiled', 'roasted', 'seasoned',
+                'hungry', 'thirsty', 'appetite', 'craving', 'satisfied', 'full', 'empty', 'stomach', 'dining', 'eating', 'drinking', 'chewing', 'swallowing', 'digestion'
+            ],
+            'travel_adventure': [
+                'travel', 'journey', 'trip', 'vacation', 'holiday', 'adventure', 'exploration', 'discovery', 'destination', 'place', 'location', 'country', 'city', 'town', 'village',
+                'airplane', 'flight', 'airport', 'hotel', 'motel', 'hostel', 'resort', 'camping', 'tent', 'backpack', 'luggage', 'suitcase', 'passport', 'visa', 'ticket',
+                'road', 'highway', 'street', 'path', 'trail', 'route', 'direction', 'map', 'compass', 'navigation', 'guide', 'tour', 'sightseeing', 'landmark', 'monument',
+                'culture', 'tradition', 'custom', 'language', 'people', 'local', 'foreign', 'international', 'domestic', 'border', 'immigration', 'customs', 'security',
+                'exciting', 'amazing', 'wonderful', 'memorable', 'unforgettable', 'breathtaking', 'stunning', 'beautiful', 'scenic', 'picturesque', 'romantic', 'peaceful'
+            ]
         }
 
         # Apply material-specific settings
@@ -1303,7 +1403,7 @@ def display_streamlit_results(results_data, config, raw_text):
         all_positive = sorted(all_positive, key=lambda x: (x['count'], x['score']), reverse=True)
         
         if all_positive:
-            pos_df = pd.DataFrame(all_positive[:15])  # Show top 15
+            pos_df = pd.DataFrame(all_positive[:25])  # Show top 25
             # Create a more user-friendly display
             display_df = pos_df.copy()
             display_df['sentiment'] = display_df['score'].apply(lambda x: 
@@ -1340,7 +1440,7 @@ def display_streamlit_results(results_data, config, raw_text):
         all_negative = sorted(all_negative, key=lambda x: (x['count'], -x['score']), reverse=True)
         
         if all_negative:
-            neg_df = pd.DataFrame(all_negative[:15])  # Show top 15
+            neg_df = pd.DataFrame(all_negative[:25])  # Show top 25
             # Create a more user-friendly display
             display_df = neg_df.copy()
             display_df['sentiment'] = display_df['score'].apply(lambda x: 
@@ -1365,7 +1465,7 @@ def display_streamlit_results(results_data, config, raw_text):
     if results_data['top_words'].get('neutral'):
         st.subheader("⚪ Neutral Words")
         st.write("**Words with neutral sentiment (neither strongly positive nor negative)**")
-        neutral_df = pd.DataFrame(results_data['top_words']['neutral'][:15])
+        neutral_df = pd.DataFrame(results_data['top_words']['neutral'][:25])
         st.dataframe(
             neutral_df[['word', 'score', 'count', 'frequency']].round(3),
             use_container_width=True
