@@ -404,24 +404,15 @@ def get_enhanced_word_sentiments(text_data, config, full_analysis=False, word_fi
     text_cleaned = re.sub(r'[^\w\s]', ' ', original_text).lower()
     words = text_cleaned.split()
     
-    # For very large texts, we'll still limit but be more generous
-    if full_analysis:
-        # Full analysis mode - analyze everything
-        max_words = len(words)
-        if word_count > 100000:
+    # Always analyze the full text for complete results
+    max_words = len(words)
+    if word_count > 100000:
+        if full_analysis:
             st.info(f"🚀 Full analysis mode: Analyzing all {word_count:,} words. This may take several minutes...")
-    else:
-        # Limited analysis mode
-        if word_count > 100000:
-            max_words = 100000  # Much more generous limit - analyze first 100k words
-            st.warning(f"⚠️ Extremely large text detected ({word_count:,} words). Analyzing first {max_words:,} words for performance.")
-            words = words[:max_words]
-        elif word_count > 50000:
-            max_words = 75000
-            st.warning(f"⚠️ Very large text ({word_count:,} words). Analyzing first {max_words:,} words for performance.")
-            words = words[:max_words]
         else:
-            max_words = len(words)  # No limit for smaller texts
+            st.warning(f"⚠️ Large text detected ({word_count:,} words). For complete analysis, enable 'Full Analysis Mode' in the sidebar.")
+            # Still analyze full text but show warning
+            st.info(f"📊 Analyzing all {word_count:,} words for complete results...")
     
     # Convert back to tokens for sentiment analysis
     tokens = words
@@ -1806,7 +1797,7 @@ def create_streamlit_visualizations(results_data, config):
                 bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
         
         st.pyplot(fig)
-        st.caption("💡 *This shows how positive/negative the text becomes as you read through it. Green areas indicate positive sentiment, red areas indicate negative sentiment.*")
+        st.caption("💡 *This shows how positive/negative the text becomes as you read through it. Green areas indicate positive sentiment, red areas indicate negative sentiment. Analysis based on full text ({:,} words).*".format(max_position))
         
         # Add summary statistics
         col1, col2, col3 = st.columns(3)
