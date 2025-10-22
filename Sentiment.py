@@ -1762,27 +1762,57 @@ def create_streamlit_visualizations(results_data, config):
             delta=f"{negative_pct:.1f}% of total"
         )
     
-    # Optional: Show sentiment trends for advanced users
-    with st.expander("📈 Advanced: Sentiment Trends Throughout Text", expanded=False):
-        if results_data['sentiment_patterns']['rolling_sentiment']:
-            st.write("**How sentiment changes as you read through the text:**")
-            
-            fig, ax = plt.subplots(figsize=(12, 6))
-            rolling_data = results_data['sentiment_patterns']['rolling_sentiment']
-            positions = [r['position'] for r in rolling_data]
-            sentiments = [r['avg_sentiment'] for r in rolling_data]
-            
-            ax.plot(positions, sentiments, linewidth=2, marker='o', markersize=4)
-            ax.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-            ax.set_xlabel('Text Position (words)')
-            ax.set_ylabel('Sentiment Score (-1 to +1)')
-            ax.set_title('Sentiment Trends Throughout Text')
-            ax.grid(alpha=0.3)
-            
-            st.pyplot(fig)
-            st.caption("💡 *This shows how positive/negative the text becomes as you read through it. Useful for analyzing story arcs or argument structure.*")
-        else:
-            st.write("No sentiment trend data available.")
+    # Sentiment Trends Visualization
+    st.subheader("📈 Sentiment Trends Throughout Text")
+    
+    if results_data['sentiment_patterns']['rolling_sentiment']:
+        st.write("**How sentiment changes as you read through the text:**")
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        rolling_data = results_data['sentiment_patterns']['rolling_sentiment']
+        positions = [r['position'] for r in rolling_data]
+        sentiments = [r['avg_sentiment'] for r in rolling_data]
+        
+        # Color the line based on sentiment
+        colors = ['red' if s < -0.1 else 'orange' if s < 0.1 else 'green' for s in sentiments]
+        
+        # Plot the sentiment trend
+        ax.plot(positions, sentiments, linewidth=2, color='blue', alpha=0.7)
+        
+        # Add colored background based on sentiment
+        for i in range(len(positions)-1):
+            color = 'lightcoral' if sentiments[i] < -0.1 else 'lightyellow' if sentiments[i] < 0.1 else 'lightgreen'
+            ax.axvspan(positions[i], positions[i+1], alpha=0.3, color=color)
+        
+        # Add horizontal lines for reference
+        ax.axhline(y=0, color='gray', linestyle='--', alpha=0.5, label='Neutral')
+        ax.axhline(y=0.1, color='green', linestyle=':', alpha=0.5, label='Positive Threshold')
+        ax.axhline(y=-0.1, color='red', linestyle=':', alpha=0.5, label='Negative Threshold')
+        
+        ax.set_xlabel('Text Position (words)')
+        ax.set_ylabel('Sentiment Score (-1 to +1)')
+        ax.set_title('Sentiment Distribution Over Time')
+        ax.grid(alpha=0.3)
+        ax.legend()
+        
+        st.pyplot(fig)
+        st.caption("💡 *This shows how positive/negative the text becomes as you read through it. Green areas indicate positive sentiment, red areas indicate negative sentiment.*")
+        
+        # Add summary statistics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            positive_segments = sum(1 for s in sentiments if s > 0.1)
+            st.metric("Positive Segments", f"{positive_segments}/{len(sentiments)}", f"{positive_segments/len(sentiments)*100:.1f}%")
+        
+        with col2:
+            negative_segments = sum(1 for s in sentiments if s < -0.1)
+            st.metric("Negative Segments", f"{negative_segments}/{len(sentiments)}", f"{negative_segments/len(sentiments)*100:.1f}%")
+        
+        with col3:
+            avg_sentiment = sum(sentiments) / len(sentiments)
+            st.metric("Average Sentiment", f"{avg_sentiment:.3f}", "Positive" if avg_sentiment > 0 else "Negative")
+    else:
+        st.write("No sentiment trend data available.")
     
     # Theme analysis
     theme_data = results_data.get('theme_analysis', {})
