@@ -1789,11 +1789,21 @@ def create_streamlit_visualizations(results_data, config):
         ax.axhline(y=0.1, color='green', linestyle=':', alpha=0.5, label='Positive Threshold')
         ax.axhline(y=-0.1, color='red', linestyle=':', alpha=0.5, label='Negative Threshold')
         
-        ax.set_xlabel('Text Position (words)')
+        # Set proper x-axis scale to show full text length
+        max_position = max(positions) if positions else 1000
+        ax.set_xlim(0, max_position)
+        
+        # Format x-axis to show full text length
+        ax.set_xlabel(f'Text Position (words) - Full Text: {max_position:,} words')
         ax.set_ylabel('Sentiment Score (-1 to +1)')
         ax.set_title('Sentiment Distribution Over Time')
         ax.grid(alpha=0.3)
         ax.legend()
+        
+        # Add color coding explanation as text annotation
+        ax.text(0.02, 0.98, '🔴 Red = Negative Sentiment\n🟡 Yellow = Neutral Sentiment\n🟢 Green = Positive Sentiment', 
+                transform=ax.transAxes, fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
         
         st.pyplot(fig)
         st.caption("💡 *This shows how positive/negative the text becomes as you read through it. Green areas indicate positive sentiment, red areas indicate negative sentiment.*")
