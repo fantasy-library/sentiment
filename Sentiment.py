@@ -566,18 +566,25 @@ def analyze_sentiment_patterns(text_data, config):
     sia = SentimentIntensityAnalyzer()
 
     sentence_sentiments = []
+    cumulative_word_position = 0
+    
     for i, sentence in enumerate(sentences):
         scores = sia.polarity_scores(sentence)
+        word_count_in_sentence = len(sentence.split())
+        
         sentence_sentiments.append({
             'sentence_num': i + 1,
             'text': sentence[:100] + '...' if len(sentence) > 100 else sentence,
             'compound': scores['compound'],
             'positive': scores['pos'],
             'negative': scores['neg'],
-            'neutral': scores['neu']
+            'neutral': scores['neu'],
+            'word_position': cumulative_word_position + word_count_in_sentence // 2  # Midpoint of sentence
         })
+        
+        cumulative_word_position += word_count_in_sentence
 
-    # Calculate sentiment trends
+    # Calculate sentiment trends based on word positions
     window_size = max(5, len(sentences) // 20)  # Adaptive window size
     rolling_sentiment = []
 
@@ -585,8 +592,11 @@ def analyze_sentiment_patterns(text_data, config):
     if len(sentences) >= window_size:
         for i in range(len(sentences) - window_size + 1):
             window_scores = [s['compound'] for s in sentence_sentiments[i:i+window_size]]
+            # Use the word position of the middle sentence in the window
+            middle_sentence = sentence_sentiments[i + window_size // 2]
+            
             rolling_sentiment.append({
-                'position': i + window_size // 2,
+                'position': middle_sentence['word_position'],
                 'avg_sentiment': np.mean(window_scores),
                 'sentiment_variance': np.var(window_scores)
             })
